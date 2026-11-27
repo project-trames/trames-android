@@ -7,7 +7,7 @@ Set `ANDROID_HOME` to the Windows SDK path. Install these pinned packages with
 the SDK manager (Android Studio can also install them):
 
 ```powershell
-sdkmanager.bat "platforms;android-37" "build-tools;36.0.0" "ndk;28.2.13676358" "cmake;3.22.1" "platform-tools"
+sdkmanager.bat "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358" "cmake;3.22.1" "platform-tools"
 git submodule update --init --recursive
 ./scripts/build.ps1
 ```

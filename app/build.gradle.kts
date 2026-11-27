@@ -1,12 +1,12 @@
 plugins { id("com.android.application") }
 android {
     namespace = "org.trames.android"
-    compileSdk = 37
+    compileSdk = 36
     ndkVersion = "28.2.13676358"
     defaultConfig {
         applicationId = "org.trames.android"
         minSdk = 30
-        targetSdk = 37
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "org.trames.android.CpuAcceptance"

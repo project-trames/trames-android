@@ -14,7 +14,7 @@ jobs:
       - name: Install Android build packages on Windows
         shell: pwsh
         run: |
-          & "$env:ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.bat" "platforms;android-37" "build-tools;36.0.0" "ndk;28.2.13676358" "cmake;3.22.1"
+          & "$env:ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.bat" "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358" "cmake;3.22.1"
           if ($LASTEXITCODE -ne 0) { throw "SDK package installation failed" }
       - name: Check compile-time interpreter-only configuration
         shell: pwsh

@@ -15,6 +15,7 @@ $env:CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER = $clang
 $env:CC_aarch64_linux_android = $clang
 $env:AR_aarch64_linux_android = Join-Path $bin "llvm-ar.exe"
 $env:CARGO_INCREMENTAL = "0"
+$env:CARGO_TARGET_DIR = Join-Path $root "target"
 rustup show
 if ($LASTEXITCODE -ne 0) { throw "Rust toolchain installation failed" }
 rustup target add aarch64-linux-android
