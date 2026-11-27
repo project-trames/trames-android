@@ -25,13 +25,15 @@ instructions and stay within one 4 KiB guest page. Host x18/TLS are untouched.
 Within each integer block, compile-time register allocation keeps values in
 caller-saved host registers. Only initial reads, dirty evictions and final dirty
 writebacks access the guest register frame. Host x18/TLS and callee-saved state
-are preserved. Scalar LDR/STR now use exact-width native fragments inside the
-existing checked Memory/View borrow. Address modes and result/writeback commits
-are predecoded; cross-page/provider staging remains explicit. No host data pointer
-is cached. Memory fragments have a different ABI and receive only checked metadata
-continuations, never machine edges from ordinary blocks. Probe flag bit 6 requires
-a real load/add/store round trip, two direct native accesses and zero fallback.
-`Engine::memory_stats()` reports memory fragments and staging separately.
+are preserved. Scalar LDR/STR use exact-width native fragments inside the existing
+checked Memory/View borrow, now fused with surrounding integer instructions and
+same-block loops when the embedding exposes instruction epochs. Helper boundaries
+publish dirty registers and precise fault progress, then refresh register borrows.
+Each guest access keeps its independent data borrow; no host data pointer is cached.
+Ordinary native links never jump into the larger helper-frame ABI. Probe flag bit 6
+requires a real load/add/store/SVC round trip, two direct native accesses, zero
+fallback and one fused entry. JNI remains schema 1 / 40 bytes.
+`Engine::memory_stats()` reports native accesses, staging and fused entries/blocks.
 
 Guest SVC is decoded during compilation and terminates its block. After dirty
 registers are published, the backend advances guest PC once and returns
@@ -88,3 +90,6 @@ results are recorded in [Runtime's scalar report](https://github.com/project-tra
 
 The scalar memory coverage and full before/after CPU-only cohort are recorded in
 [Runtime's memory report](https://github.com/project-trames/trames-runtime/blob/d764fc7b920aa73e31b7a91c88512b36c349c5eb/docs/validation/jit-memory-20261127.md).
+
+Mixed integer/memory block fusion, precise helper exits and the complete
+before/after cohort are recorded in [Runtime's fusion report](https://github.com/project-trames/trames-runtime/blob/5ca460c401745c4a631bbeacbb829e687598231f/docs/validation/jit-memory-fusion-20261127.md).

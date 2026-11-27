@@ -216,6 +216,7 @@ fn memory_probe() -> Result<(), String> {
         || engine.stats.fallback_instructions != 0
         || engine.memory_stats().instructions != 2
         || engine.memory_stats().staged != 0
+        || engine.memory_stats().fused_entries != 1
     {
         return Err(format!("native scalar memory probe: {outcome:?}"));
     }
