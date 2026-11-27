@@ -17,15 +17,21 @@ conditional and register branches. CRC/FlagM/FlagM2/CSSC emit actual host opcode
 when process-host HWCAP provides them. Native capability advertisement is now
 host-driven; there are no new software extension replacements or extra emulated
 extension state. Original guest memory is RX data, never patched. Remaining
-instruction families retain the legacy interpreter path, including checked
-memory, FP/SIMD and exclusive reservations. Each worker owns a bounded RW-to-RX cache;
+instruction families retain the legacy interpreter path, including FP/SIMD,
+pairs and exclusive reservations. Each worker owns a bounded RW-to-RX cache;
 invalidation reuses Runtime code-page identities. Native blocks are at most 64
 instructions and stay within one 4 KiB guest page. Host x18/TLS are untouched.
 
 Within each integer block, compile-time register allocation keeps values in
 caller-saved host registers. Only initial reads, dirty evictions and final dirty
 writebacks access the guest register frame. Host x18/TLS and callee-saved state
-are preserved. Guest memory operations still use the canonical interpreter.
+are preserved. Scalar LDR/STR now use exact-width native fragments inside the
+existing checked Memory/View borrow. Address modes and result/writeback commits
+are predecoded; cross-page/provider staging remains explicit. No host data pointer
+is cached. Memory fragments have a different ABI and receive only checked metadata
+continuations, never machine edges from ordinary blocks. Probe flag bit 6 requires
+a real load/add/store round trip, two direct native accesses and zero fallback.
+`Engine::memory_stats()` reports memory fragments and staging separately.
 
 Guest SVC is decoded during compilation and terminates its block. After dirty
 registers are published, the backend advances guest PC once and returns
@@ -53,7 +59,7 @@ linked SUBS/B.NE countdown with exact retirement and NZCV. The JNI ABI remains
 40 bytes. The backend reuses existing task SP/NZCV state and never changes host
 SP or TLS; capability gates run during translation, not per instruction.
 
-Full host-ISA native coverage remains in progress. Checked memory, atomics and
+Full host-ISA native coverage remains in progress. Remaining memory forms, atomics and
 FP/NEON/vector families are the next groups; stateful extensions need real
 context-save ownership. CPU-only benchmarks exclude Linux syscall handlers,
 filesystem/network, JNI and Android lifecycle costs.
@@ -79,3 +85,6 @@ in [Runtime's linking report](https://github.com/project-trames/trames-runtime/b
 
 Host-driven scalar coverage, reached-PC SIGILL and frozen same-VM performance
 results are recorded in [Runtime's scalar report](https://github.com/project-trames/trames-runtime/blob/02cc4833df6c140f4468277a970858e0cd1f08b2/docs/validation/jit-host-scalars-20261127.md).
+
+The scalar memory coverage and full before/after CPU-only cohort are recorded in
+[Runtime's memory report](https://github.com/project-trames/trames-runtime/blob/d764fc7b920aa73e31b7a91c88512b36c349c5eb/docs/validation/jit-memory-20261127.md).
