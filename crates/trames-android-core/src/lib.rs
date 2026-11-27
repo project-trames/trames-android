@@ -186,13 +186,22 @@ fn branch_probe() -> Result<(), String> {
 
 #[cfg(feature = "jit")]
 fn memory_probe() -> Result<(), String> {
-    let words = [0xf9400020u32, 0x91000400, 0xf9000020, 0xd4000001];
+    let words = [
+        0xf9400020u32,
+        0x91000400,
+        0xf9000020,
+        0xf9400020,
+        0x91000400,
+        0xf9000020,
+        0xd4000001,
+    ];
+    let data_len = (PAGE_SIZE as usize).max(trames_memory::host_mapping_granule());
     let mut memory = Memory::default();
     memory
         .map(0x1000, PAGE_SIZE, Permissions::RW)
         .map_err(|e| e.to_string())?;
     memory
-        .map(0x2000, PAGE_SIZE, Permissions::RW)
+        .map(0x10000, data_len as u64, Permissions::RW)
         .map_err(|e| e.to_string())?;
     for (i, word) in words.iter().enumerate() {
         memory
@@ -202,19 +211,25 @@ fn memory_probe() -> Result<(), String> {
     memory
         .protect(0x1000, PAGE_SIZE, Permissions::RX)
         .map_err(|e| e.to_string())?;
+    // Materialize a complete host protection group before admitting an alias;
+    // the probe runs on both 4 KiB and 16 KiB Android configurations.
     memory
-        .write_array(0x2000, 41u64.to_le_bytes())
+        .write(0x10000, &vec![0; data_len])
+        .map_err(|e| e.to_string())?;
+    memory
+        .write_array(0x10000, 40u64.to_le_bytes())
         .map_err(|e| e.to_string())?;
     let mut cpu = Cpu::new(0x1000, 0);
-    cpu.set_x(1, 0x2000);
+    cpu.set_x(1, 0x10000);
     let mut engine = <Cpu as Backend>::Engine::default();
     let outcome = cpu.run(&mut engine, &mut memory, 64);
-    if !matches!(outcome, SliceOutcome::Syscall { instructions: 4 })
+    if !matches!(outcome, SliceOutcome::Syscall { instructions: 7 })
         || cpu.x(0) != 42
-        || cpu.pc() != 0x1010
-        || memory.read_u64(0x2000).map_err(|e| e.to_string())? != 42
+        || cpu.pc() != 0x101c
+        || memory.read_u64(0x10000).map_err(|e| e.to_string())? != 42
         || engine.stats.fallback_instructions != 0
-        || engine.memory_stats().instructions != 2
+        || engine.memory_stats().instructions != 4
+        || engine.memory_stats().hardware != 2
         || engine.memory_stats().staged != 0
         || engine.memory_stats().fused_entries != 1
     {
