@@ -11,10 +11,14 @@ emission is further gated to AArch64 Linux/Android at compile time. iPad depends
 only on `trames-interpreter`: neither the JIT crate nor executable cache is in
 its compilation graph. This isolation adds no ordinary runtime capability test.
 
-The first compiler translates whitelisted non-flag integer instructions, ADR/P,
-B/BL and NOP. Original guest memory is RX data, never patched. Other instructions
-run through the canonical interpreter, retaining deferred flags, guest TLS,
-FP/SIMD and exclusive reservations. Each worker owns a bounded RW-to-RX cache;
+The compiler translates baseline integer arithmetic/logic, SP/NZCV forms,
+carry/conditional operations, multiply/divide, bitfields, shifts and fixed,
+conditional and register branches. CRC/FlagM/FlagM2/CSSC emit actual host opcodes
+when process-host HWCAP provides them. Native capability advertisement is now
+host-driven; there are no new software extension replacements or extra emulated
+extension state. Original guest memory is RX data, never patched. Remaining
+instruction families retain the legacy interpreter path, including checked
+memory, FP/SIMD and exclusive reservations. Each worker owns a bounded RW-to-RX cache;
 invalidation reuses Runtime code-page identities. Native blocks are at most 64
 instructions and stay within one 4 KiB guest page. Host x18/TLS are untouched.
 
@@ -43,8 +47,16 @@ and budget still match. Signal/restart redirection and unknown memory embeddings
 fall back to lookup. Probe flag bit 4 requires both real native links and cached
 syscall resumption.
 
-Translated guest memory accesses and conditional control flow remain later optimizations. CPU-only exit benchmarks do not include Linux syscall
-handler, filesystem/network, JNI or Android lifecycle costs.
+Conditional paths publish their actual guest PC and follow a native link only
+when it matches the resolved target. Probe flag bit 5 requires a zero-fallback,
+linked SUBS/B.NE countdown with exact retirement and NZCV. The JNI ABI remains
+40 bytes. The backend reuses existing task SP/NZCV state and never changes host
+SP or TLS; capability gates run during translation, not per instruction.
+
+Full host-ISA native coverage remains in progress. Checked memory, atomics and
+FP/NEON/vector families are the next groups; stateful extensions need real
+context-save ownership. CPU-only benchmarks exclude Linux syscall handlers,
+filesystem/network, JNI and Android lifecycle costs.
 
 Next milestones:
 
@@ -64,3 +76,6 @@ recorded in [Runtime's JIT report](https://github.com/project-trames/trames-runt
 
 Same-page linking design and measured CPU-only before/after results are recorded
 in [Runtime's linking report](https://github.com/project-trames/trames-runtime/blob/eefc3b2d9efa46899d68248cae1249a2b2add349/docs/validation/jit-links-20261127.md).
+
+Host-driven scalar coverage, reached-PC SIGILL and frozen same-VM performance
+results are recorded in [Runtime's scalar report](https://github.com/project-trames/trames-runtime/blob/02cc4833df6c140f4468277a970858e0cd1f08b2/docs/validation/jit-host-scalars-20261127.md).

@@ -91,6 +91,15 @@ pub fn probe() -> Result<Probe, String> {
     };
     #[cfg(not(feature = "jit"))]
     let linked = false;
+    #[cfg(feature = "jit")]
+    let branches = if compiled {
+        branch_probe()?;
+        true
+    } else {
+        false
+    };
+    #[cfg(not(feature = "jit"))]
+    let branches = false;
     for (i, word) in words.iter().enumerate() {
         if memory
             .fetch_u32(0x1000 + i as u64 * 4)
@@ -110,12 +119,59 @@ pub fn probe() -> Result<Probe, String> {
             | ((compiled as u32) << 1)
             | (((native > 0) as u32) << 2)
             | (((direct > 0) as u32) << 3)
-            | ((linked as u32) << 4),
+            | ((linked as u32) << 4)
+            | ((branches as u32) << 5),
         instructions: 3,
         host_page_size: page as u64,
         guest_page_size: PAGE_SIZE,
         native_instructions: native,
     })
+}
+
+#[cfg(feature = "jit")]
+fn branch_probe() -> Result<(), String> {
+    let words = [
+        0xd2800221u32,
+        0x91000400,
+        0xf1000421,
+        0x54ffffc1,
+        0xd4000001,
+    ];
+    let mut memory = Memory::default();
+    memory
+        .map(0x1000, PAGE_SIZE, Permissions::RW)
+        .map_err(|e| e.to_string())?;
+    for (i, word) in words.iter().enumerate() {
+        memory
+            .write_array(0x1000 + i as u64 * 4, word.to_le_bytes())
+            .map_err(|e| e.to_string())?;
+    }
+    memory
+        .protect(0x1000, PAGE_SIZE, Permissions::RX)
+        .map_err(|e| e.to_string())?;
+    let mut cpu = Cpu::new(0x1000, 0);
+    let mut engine = <Cpu as Backend>::Engine::default();
+    let outcome = cpu.run(&mut engine, &mut memory, 64);
+    if !matches!(outcome, SliceOutcome::Syscall { instructions: 53 })
+        || cpu.x(0) != 17
+        || cpu.x(1) != 0
+        || cpu.pc() != 0x1014
+        || cpu.architectural_state().nzcv != 0x60000000
+        || engine.stats.fallback_instructions != 0
+        || engine.link_stats().linked_blocks == 0
+    {
+        return Err(format!("native conditional branch probe: {outcome:?}"));
+    }
+    for (i, word) in words.iter().enumerate() {
+        if memory
+            .fetch_u32(0x1000 + i as u64 * 4)
+            .map_err(|e| e.to_string())?
+            != *word
+        {
+            return Err("conditional branch guest bytes changed".into());
+        }
+    }
+    Ok(())
 }
 
 /// # Safety

@@ -18,7 +18,7 @@ public final class CpuAcceptance extends Instrumentation {
             if (uid < 10000 || debuggable) throw new IllegalStateException("Requires ordinary app UID and non-debuggable target");
             String raw = NativeBridge.cpuProbe();
             JSONObject report = new JSONObject(raw);
-            if (report.getInt("status") != 0 || report.getLong("native_instructions") != 2 || (report.getInt("flags") & 8) == 0 || (report.getInt("flags") & 16) == 0 || report.getLong("guest_page_size") != 4096 || report.getLong("instructions") != 3) throw new IllegalStateException(raw);
+            if (report.getInt("status") != 0 || report.getLong("native_instructions") != 2 || (report.getInt("flags") & 8) == 0 || (report.getInt("flags") & 16) == 0 || (report.getInt("flags") & 32) == 0 || report.getLong("guest_page_size") != 4096 || report.getLong("instructions") != 3) throw new IllegalStateException(raw);
             result.putString("cpu_report", raw);
             result.putInt("app_uid", uid);
             result.putBoolean("debuggable", debuggable);
