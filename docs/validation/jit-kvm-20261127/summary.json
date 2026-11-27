@@ -1,0 +1,58 @@
+[
+  {
+    "transport": "smccc",
+    "workload": "integer-loop",
+    "jit_ns_per_unit": 0.2145977020263672,
+    "kvm_ns_per_unit": 0.22462915565770064,
+    "kvm_over_jit": 1.0467453916636111
+  },
+  {
+    "transport": "smccc",
+    "workload": "integer-countdown",
+    "jit_ns_per_unit": 1.702827545904344,
+    "kvm_ns_per_unit": 0.22422039893365675,
+    "kvm_over_jit": 0.13167534168269338
+  },
+  {
+    "transport": "smccc",
+    "workload": "svc-only",
+    "jit_ns_per_unit": 5.26675,
+    "kvm_ns_per_unit": 34246.56225,
+    "kvm_over_jit": 6502.408933402953
+  },
+  {
+    "transport": "smccc",
+    "workload": "svc-continuation",
+    "jit_ns_per_unit": 7.8105,
+    "kvm_ns_per_unit": 36071.45345,
+    "kvm_over_jit": 4618.328333653415
+  },
+  {
+    "transport": "mmio",
+    "workload": "integer-loop",
+    "jit_ns_per_unit": 0.22640465151879094,
+    "kvm_ns_per_unit": 0.23763485265500736,
+    "kvm_over_jit": 1.0496023428002952
+  },
+  {
+    "transport": "mmio",
+    "workload": "integer-countdown",
+    "jit_ns_per_unit": 1.7491810706353956,
+    "kvm_ns_per_unit": 0.23778472408171622,
+    "kvm_over_jit": 0.13594059990332513
+  },
+  {
+    "transport": "mmio",
+    "workload": "svc-only",
+    "jit_ns_per_unit": 5.575,
+    "kvm_ns_per_unit": 46350.3277,
+    "kvm_over_jit": 8313.960125560538
+  },
+  {
+    "transport": "mmio",
+    "workload": "svc-continuation",
+    "jit_ns_per_unit": 7.8459,
+    "kvm_ns_per_unit": 46586.664,
+    "kvm_over_jit": 5937.708102320957
+  }
+]

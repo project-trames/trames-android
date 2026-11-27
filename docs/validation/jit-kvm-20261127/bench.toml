@@ -1,0 +1,11 @@
+[package]
+name = "jit-kvm-compare"
+version = "0.0.0"
+edition = "2021"
+[dependencies]
+trames-engine.workspace = true
+trames-memory.workspace = true
+trames-execution.workspace = true
+trames-kvm = { path = "../crates/trames-kvm" }
+trames-jit = { path = "../runtime/crates/trames-jit", features = ["native-aarch64"] }
+serde_json.workspace = true

@@ -1,0 +1,53 @@
+{"host":{"arm_ipa_bits":40,"backend_implemented":true,"cpu":{"architecture":"aarch64","features":"fp asimd aes pmull sha1 sha2 crc32 atomics fphp asimdhp asimdrdm jscvt fcma lrcpc dcpop sha3 asimddp sha512 asimdfhm uscat ilrcpc flagm sb dcpodp flagm2 frint i8mm bf16 afp rpres ebf16 lut","hwcap":783546363,"hwcap2":562954251559297,"kvm_capabilities":{"guest_debug":true,"mte":false,"paca":true,"pacg":true,"sve":false},"registers":{"id_aa64isar0_el1":153421459058925856,"id_aa64isar1_el1":4541056039325698,"id_aa64isar2_el1":72057594037927952,"id_aa64mmfr1_el1":17592474476576,"id_aa64mmfr2_el1":1153203052598001681,"id_aa64pfr0_el1":1225260574444683537}},"host_arch":"aarch64","host_os":"linux","host_page_size":4096,"immediate_exit":true,"issues":[],"kvm_api_version":12,"max_vcpus":512,"memory_slots":32767,"smccc_forwarding":true,"user_memory":true},"scope":"CPU backend + simulated syscall return; same Runtime, View, bytes and worker assignment hooks; excludes Linux handlers/JNI/startup; integer normalized by actual ADD count"}
+{"lane":"jit","ns":8329943,"ns_per_unit":0.25625976439445247,"sample":0,"units":32505856,"warmup":true,"workload":"integer-loop","yields":0}
+{"lane":"kvm","ns":68827645,"ns_per_unit":0.23088100258019606,"sample":0,"units":298108741,"warmup":true,"workload":"integer-loop","yields":0}
+{"lane":"kvm","ns":68428224,"ns_per_unit":0.22468411066607785,"sample":1,"units":304553018,"warmup":false,"workload":"integer-loop","yields":0}
+{"lane":"jit","ns":6975682,"ns_per_unit":0.2145977020263672,"sample":1,"units":32505856,"warmup":false,"workload":"integer-loop","yields":0}
+{"lane":"jit","ns":7052058,"ns_per_unit":0.2169473094324912,"sample":2,"units":32505856,"warmup":false,"workload":"integer-loop","yields":0}
+{"lane":"kvm","ns":68454516,"ns_per_unit":0.22492621296889256,"sample":2,"units":304342100,"warmup":false,"workload":"integer-loop","yields":0}
+{"lane":"kvm","ns":68298557,"ns_per_unit":0.22462915565770064,"sample":3,"units":304050277,"warmup":false,"workload":"integer-loop","yields":0}
+{"lane":"jit","ns":6968307,"ns_per_unit":0.21437081983012538,"sample":3,"units":32505856,"warmup":false,"workload":"integer-loop","yields":0}
+{"lane":"jit","ns":6978015,"ns_per_unit":0.21466947370959866,"sample":4,"units":32505856,"warmup":false,"workload":"integer-loop","yields":0}
+{"lane":"kvm","ns":67967429,"ns_per_unit":0.22384583576687475,"sample":4,"units":303634994,"warmup":false,"workload":"integer-loop","yields":0}
+{"lane":"kvm","ns":68370891,"ns_per_unit":0.2238475104757027,"sample":5,"units":305435119,"warmup":false,"workload":"integer-loop","yields":0}
+{"lane":"jit","ns":6970599,"ns_per_unit":0.2144413302021642,"sample":5,"units":32505856,"warmup":false,"workload":"integer-loop","yields":0}
+{"jit_links":"LinkStats { entries: 193, linked_blocks: 6291263, syscall_resumes: 0, lookups: 1 }","jit_stats":"Stats { native_blocks: 6291456, native_instructions: 201326592, fallback_instructions: 0, direct_syscall_exits: 0 }","workload":"integer-loop"}
+{"lane":"jit","ns":54013940,"ns_per_unit":1.6616679776099421,"sample":0,"units":32505856,"warmup":true,"workload":"integer-countdown","yields":32}
+{"lane":"kvm","ns":8253067,"ns_per_unit":0.25389477514451547,"sample":0,"units":32505856,"warmup":true,"workload":"integer-countdown","yields":1}
+{"lane":"kvm","ns":7361560,"ns_per_unit":0.22646873228011594,"sample":1,"units":32505856,"warmup":false,"workload":"integer-countdown","yields":0}
+{"lane":"jit","ns":55353701,"ns_per_unit":1.7028839665074502,"sample":1,"units":32505856,"warmup":false,"workload":"integer-countdown","yields":32}
+{"lane":"jit","ns":55500077,"ns_per_unit":1.7073870320473947,"sample":2,"units":32505856,"warmup":false,"workload":"integer-countdown","yields":32}
+{"lane":"kvm","ns":7281185,"ns_per_unit":0.22399610088717553,"sample":2,"units":32505856,"warmup":false,"workload":"integer-countdown","yields":0}
+{"lane":"kvm","ns":7238559,"ns_per_unit":0.2226847679384293,"sample":3,"units":32505856,"warmup":false,"workload":"integer-countdown","yields":0}
+{"lane":"jit","ns":55173533,"ns_per_unit":1.6973413344352477,"sample":3,"units":32505856,"warmup":false,"workload":"integer-countdown","yields":32}
+{"lane":"jit","ns":55230450,"ns_per_unit":1.6990923112438572,"sample":4,"units":32505856,"warmup":false,"workload":"integer-countdown","yields":32}
+{"lane":"kvm","ns":7305893,"ns_per_unit":0.22475621008103894,"sample":4,"units":32505856,"warmup":false,"workload":"integer-countdown","yields":0}
+{"lane":"kvm","ns":7288476,"ns_per_unit":0.22422039893365675,"sample":5,"units":32505856,"warmup":false,"workload":"integer-countdown","yields":0}
+{"lane":"jit","ns":55351867,"ns_per_unit":1.702827545904344,"sample":5,"units":32505856,"warmup":false,"workload":"integer-countdown","yields":32}
+{"jit_links":"LinkStats { entries: 6291672, linked_blocks: 0, syscall_resumes: 0, lookups: 12583136 }","jit_stats":"Stats { native_blocks: 6291672, native_instructions: 201326592, fallback_instructions: 6291456, direct_syscall_exits: 24 }","workload":"integer-countdown"}
+{"lane":"jit","ns":114459,"ns_per_unit":5.72295,"sample":0,"units":20000,"warmup":true,"workload":"svc-only","yields":0}
+{"lane":"kvm","ns":682028806,"ns_per_unit":34101.4403,"sample":0,"units":20000,"warmup":true,"workload":"svc-only","yields":335}
+{"lane":"kvm","ns":684931245,"ns_per_unit":34246.56225,"sample":1,"units":20000,"warmup":false,"workload":"svc-only","yields":337}
+{"lane":"jit","ns":105335,"ns_per_unit":5.26675,"sample":1,"units":20000,"warmup":false,"workload":"svc-only","yields":0}
+{"lane":"jit","ns":104543,"ns_per_unit":5.22715,"sample":2,"units":20000,"warmup":false,"workload":"svc-only","yields":0}
+{"lane":"kvm","ns":684110778,"ns_per_unit":34205.5389,"sample":2,"units":20000,"warmup":false,"workload":"svc-only","yields":337}
+{"lane":"kvm","ns":684771032,"ns_per_unit":34238.5516,"sample":3,"units":20000,"warmup":false,"workload":"svc-only","yields":337}
+{"lane":"jit","ns":105959,"ns_per_unit":5.29795,"sample":3,"units":20000,"warmup":false,"workload":"svc-only","yields":0}
+{"lane":"jit","ns":104501,"ns_per_unit":5.22505,"sample":4,"units":20000,"warmup":false,"workload":"svc-only","yields":0}
+{"lane":"kvm","ns":737055706,"ns_per_unit":36852.7853,"sample":4,"units":20000,"warmup":false,"workload":"svc-only","yields":362}
+{"lane":"kvm","ns":733542133,"ns_per_unit":36677.10665,"sample":5,"units":20000,"warmup":false,"workload":"svc-only","yields":361}
+{"lane":"jit","ns":163418,"ns_per_unit":8.1709,"sample":5,"units":20000,"warmup":false,"workload":"svc-only","yields":0}
+{"jit_links":"LinkStats { entries: 120000, linked_blocks: 0, syscall_resumes: 0, lookups: 1 }","jit_stats":"Stats { native_blocks: 120000, native_instructions: 0, fallback_instructions: 0, direct_syscall_exits: 120000 }","workload":"svc-only"}
+{"lane":"jit","ns":239627,"ns_per_unit":11.98135,"sample":0,"units":20000,"warmup":true,"workload":"svc-continuation","yields":0}
+{"lane":"kvm","ns":730416689,"ns_per_unit":36520.83445,"sample":0,"units":20000,"warmup":true,"workload":"svc-continuation","yields":359}
+{"lane":"kvm","ns":722581416,"ns_per_unit":36129.0708,"sample":1,"units":20000,"warmup":false,"workload":"svc-continuation","yields":355}
+{"lane":"jit","ns":156043,"ns_per_unit":7.80215,"sample":1,"units":20000,"warmup":false,"workload":"svc-continuation","yields":0}
+{"lane":"jit","ns":159210,"ns_per_unit":7.9605,"sample":2,"units":20000,"warmup":false,"workload":"svc-continuation","yields":0}
+{"lane":"kvm","ns":721365279,"ns_per_unit":36068.26395,"sample":2,"units":20000,"warmup":false,"workload":"svc-continuation","yields":355}
+{"lane":"kvm","ns":721429069,"ns_per_unit":36071.45345,"sample":3,"units":20000,"warmup":false,"workload":"svc-continuation","yields":355}
+{"lane":"jit","ns":167669,"ns_per_unit":8.38345,"sample":3,"units":20000,"warmup":false,"workload":"svc-continuation","yields":0}
+{"lane":"jit","ns":155084,"ns_per_unit":7.7542,"sample":4,"units":20000,"warmup":false,"workload":"svc-continuation","yields":0}
+{"lane":"kvm","ns":726545193,"ns_per_unit":36327.25965,"sample":4,"units":20000,"warmup":false,"workload":"svc-continuation","yields":357}
+{"lane":"kvm","ns":720515892,"ns_per_unit":36025.7946,"sample":5,"units":20000,"warmup":false,"workload":"svc-continuation","yields":355}
+{"lane":"jit","ns":156210,"ns_per_unit":7.8105,"sample":5,"units":20000,"warmup":false,"workload":"svc-continuation","yields":0}
+{"jit_links":"LinkStats { entries: 120001, linked_blocks: 119999, syscall_resumes: 119998, lookups: 3 }","jit_stats":"Stats { native_blocks: 240000, native_instructions: 240000, fallback_instructions: 0, direct_syscall_exits: 120000 }","workload":"svc-continuation"}

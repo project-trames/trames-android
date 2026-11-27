@@ -1,0 +1,42 @@
+[workspace]
+resolver = "2"
+members = ["crates/trames-kvm", "bench"]
+exclude = ["runtime", "cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.101"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/project-trames/trames-linux"
+
+[workspace.dependencies]
+trames-net = { path = "runtime/crates/trames-net" }
+trames-host = { path = "runtime/crates/trames-host" }
+trames-cli-common = { path = "cli/crates/trames-cli-common" }
+trames-shared = { path = "runtime/crates/trames-shared" }
+trames-wayland = { path = "runtime/crates/trames-wayland" }
+trames-graphics = { path = "runtime/crates/trames-graphics" }
+trames-vulkan = { path = "runtime/crates/trames-vulkan" }
+trames-execution = { path = "runtime/crates/trames-execution" }
+trames-engine = { path = "runtime/crates/trames-engine" }
+trames-memory = { path = "runtime/crates/trames-memory" }
+trames-session = { path = "runtime/crates/trames-session" }
+trames-distro = { path = "runtime/crates/trames-distro" }
+trames-accel = { path = "runtime/crates/trames-accel" }
+trames-linux-abi = { package = "trames-linux", path = "runtime/crates/trames-linux" }
+trames-vfs = { path = "runtime/crates/trames-vfs", features = ["hostfs"] }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+libc = "=0.2.190"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[profile.release]
+overflow-checks = true
+lto = "thin"
+
+[patch.crates-io]
+smoltcp = { path = "runtime/vendor/smoltcp" }
+wayland-backend = { path = "runtime/vendor/wayland-backend" }

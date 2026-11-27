@@ -1,0 +1,41 @@
+{
+  "runtime": "eefc3b2d9efa46899d68248cae1249a2b2add349",
+  "kvm_linux": "9db947eba448b871f31ca06511c46430bfb35387",
+  "host": "existing Lima/VZ ARM64 VM, nested KVM",
+  "kernel": "7.0.0-44-generic",
+  "page_size": 4096,
+  "cpu_affinity": [
+    2
+  ],
+  "toolchain": "rustc 1.101.0-nightly (4ebd25825 2026-10-15), LLVM 23.1.4",
+  "profile": {
+    "release": true,
+    "lto": "thin",
+    "overflow_checks": true,
+    "incremental": false
+  },
+  "binary_sha256": "854f9f7bff475de0080ebd1af76a3a6e697cda686a7ce4c736d5c53e14dd1147",
+  "samples": {
+    "total": 96,
+    "measured": 80,
+    "warmups": 16
+  },
+  "source_product_changes": false,
+  "notes": [
+    "Both engines linked to the same archived Runtime snapshot; this does not repin the Linux product.",
+    "All four workloads and both transports use the same final benchmark binary.",
+    "One warm-up followed by five measured samples; alternating lane order per workload.",
+    "Integer units are actual ADD operations; SVC units are backend exits with simulated returns.",
+    "KVM instruction retirement is unavailable; integer units are inferred from validated x0 delta."
+  ],
+  "artifact_sha256": {
+    "summary.json": "39de74175e6d65b20103458476f74cccb201fbbd6a58f3660bea361686012beb",
+    "mmio.jsonl": "6b5d1ce426c44971ca9b7c03eb314f2819f8e110dfe4a300825b110d553aad1c",
+    "Cargo.lock": "5df59689506d3072c05b193004dddfde1e1e5ca6a3bea279418f2e192bd89566",
+    "workspace.toml": "50cc0874369b9f94e6f33b7d6c0c796c961a3d060c7f52381f4238639fbd6fa0",
+    "rust-toolchain.toml": "afa3f4f9d68bb775d4e994e98c21b73f14fa67464833cfe7c07c42ffb07c5640",
+    "smccc.jsonl": "ab51715874bfc9a27227a58d52dc3649edc19a800e5e89d39f648f0ff6a1e0f0",
+    "bench.rs": "4c33c811b1954f6e93c33db62fe630c46ffc85ab0f7e7ef317d8da5132558cd3",
+    "bench.toml": "8c9b28f8fa9ce3c38a067d666d5032206fef8cf710fe2ec95290167f701d7f94"
+  }
+}
