@@ -47,7 +47,7 @@ comment and this paired record do not rerun code validation:
   passes Clippy, all 36 JIT tests and the CPU fixture. Broader Linux/Mac workspace
   jobs are still running when this record is published.
 - Android `59e0766`: [paired run 46025174090](https://github.com/project-trames/trames-android/actions/runs/46025174090)
-  passes ARM64 native CPU acceptance. Windows packaging is building and the Mac
-  runner is queued at publication; neither pending job is counted as a pass.
+  passes ARM64 native CPU acceptance and Windows packaging. The Mac runner is
+  still queued at publication; the queued job is not counted as a pass.
 - Local Mac CPU/core checks and the actual ARM64 core probe above already pass.
   Task-owned source/build caches were removed after freezing the evidence.
