@@ -35,3 +35,18 @@ Windows packaging CI is triggered by this paired implementation commit. Real
 non-debuggable Android app-UID/ART/16 KiB execution still requires device tests.
 No SDK/NDK/JDK/emulator was installed on Mac; task-owned temporary sources and
 build/measurement outputs are cleaned after the evidence is frozen.
+
+CI receipts preserve the tested implementation identities:
+
+- Runtime `1fa3f08`: [ARM64 native JIT job](https://github.com/project-trames/trames-runtime/actions/runs/46045912929/job/140665026054)
+  passed strict Clippy, all 45 JIT tests and the CPU fixture.
+- Android `76fe3ac`: [ARM64 core/native job](https://github.com/project-trames/trames-android/actions/runs/46046065587/job/140665544677)
+  and [Mac core job](https://github.com/project-trames/trames-android/actions/runs/46046065587/job/140665544569)
+  passed compile-time feature checks, interpreter/JIT core probes and their
+  platform's Runtime JIT tests. Mac does not execute native JIT.
+- [Windows packaging](https://github.com/project-trames/trames-android/actions/runs/46046065587/job/140665544291)
+  is still building validation APKs; Runtime full Linux/Mac workspace jobs are
+  still running. Those jobs are not counted as passes at publication.
+- This receipt-only follow-up keeps the tested Runtime pin and skips another CI
+  run. Task-owned source copies, measurement executables and the 261 MiB local
+  Mac build cache were removed after verifying the frozen source hashes.
