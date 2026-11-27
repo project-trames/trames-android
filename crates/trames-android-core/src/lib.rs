@@ -193,6 +193,15 @@ fn memory_probe() -> Result<(), String> {
         0xf9400020,
         0x91000400,
         0xf9000020,
+        0xa9401020, // LDP x0,x4
+        0x91000400,
+        0xa9001020, // STP x0,x4
+        0xc8dffc20, // LDAR x0
+        0x91000400,
+        0xc89ffc20, // STLR x0
+        0xd5033bbf, // DMB ISH
+        0xd5033b9f, // DSB ISH
+        0xd5033fdf, // ISB SY
         0xd4000001,
     ];
     let data_len = (PAGE_SIZE as usize).max(trames_memory::host_mapping_granule());
@@ -223,19 +232,21 @@ fn memory_probe() -> Result<(), String> {
     cpu.set_x(1, 0x10000);
     let mut engine = <Cpu as Backend>::Engine::default();
     let outcome = cpu.run(&mut engine, &mut memory, 64);
-    if !matches!(outcome, SliceOutcome::Syscall { instructions: 7 })
-        || cpu.x(0) != 42
-        || cpu.pc() != 0x101c
-        || memory.read_u64(0x10000).map_err(|e| e.to_string())? != 42
+    if !matches!(outcome, SliceOutcome::Syscall { instructions: 16 })
+        || cpu.x(0) != 44
+        || cpu.pc() != 0x1040
+        || memory.read_u64(0x10000).map_err(|e| e.to_string())? != 44
         || engine.stats.fallback_instructions != 0
-        || engine.memory_stats().instructions != 4
-        || engine.memory_stats().hardware != 2
-        || engine.memory_stats().direct != 2
+        || engine.memory_stats().instructions != 8
+        || engine.memory_stats().hardware != 6
+        || engine.memory_stats().direct != 6
         || engine.compilation_stats().address_reuses == 0
         || engine.memory_stats().staged != 0
         || engine.memory_stats().fused_entries != 1
     {
-        return Err(format!("native scalar memory probe: {outcome:?}"));
+        return Err(format!(
+            "native scalar/pair/ordered/barrier memory probe: {outcome:?}"
+        ));
     }
     for (i, word) in words.iter().enumerate() {
         if memory
