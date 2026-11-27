@@ -94,10 +94,12 @@ The scalar memory coverage and full before/after CPU-only cohort are recorded in
 Mixed integer/memory block fusion, precise helper exits and the complete
 before/after cohort are recorded in [Runtime's fusion report](https://github.com/project-trames/trames-runtime/blob/5ca460c401745c4a631bbeacbb829e687598231f/docs/validation/jit-memory-fusion-20261127.md).
 
-The memory probe also requires native integer paired transfers, LDAR/STLR and
-DMB/DSB/ISB. It checks eight memory instructions, six inline hardware/direct hits,
-zero fallback/staging and unchanged canonical/code bytes. Native hits use host
-instructions without an extra software alignment preflight or new memory locks;
-ISA/embedding admission remains cold. JNI schema and existing flag bit 6 stay
-unchanged. The full paired measurements and platform checks are recorded in
-[Runtime's paired/ordered report](https://github.com/project-trames/trames-runtime/blob/d178606df13cef13b49e5ed5903eac8d2aed6d0c/docs/validation/jit-pairs-ordering-20261128.md).
+The memory probe requires native integer paired transfers, LDAR/STLR and
+DMB/DSB/ISB, then adds LSE CAS/CASP/LDADD and RCpc/unscaled accesses when the
+process-host ABI provides those extensions. It requires zero fallback/staging,
+correct canonical bytes, unchanged guest code and actual hardware/direct hits
+for every warmed access. It keeps schema 1, the 40-byte JNI layout and flag bit 6.
+Native hits have no new software alignment preflight, ordinary fence or global
+lock; ISA admission and reserved-register allocation run in the cold compiler.
+The full paired measurements and platform checks are recorded in
+[Runtime's LSE/RCpc report](https://github.com/project-trames/trames-runtime/blob/a4fe0eb0f744987bd0e8b315567ce3663aaff0c1/docs/validation/jit-lse-rcpc-20261128.md).

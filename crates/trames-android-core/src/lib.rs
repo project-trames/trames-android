@@ -186,7 +186,7 @@ fn branch_probe() -> Result<(), String> {
 
 #[cfg(feature = "jit")]
 fn memory_probe() -> Result<(), String> {
-    let words = [
+    let mut words = vec![
         0xf9400020u32,
         0x91000400,
         0xf9000020,
@@ -204,6 +204,32 @@ fn memory_probe() -> Result<(), String> {
         0xd5033fdf, // ISB SY
         0xd4000001,
     ];
+    // This is a diagnostic probe, not the CPU execution hot path. Only test
+    // instructions present in the actual process-host ABI; never emulate an
+    // absent extension to make the probe pass.
+    let host = trames_jit::host_features().ok_or("native host profile missing")?;
+    let mut expected = 44;
+    let mut memory_instructions = 8;
+    words.pop();
+    if host.hwcap & (1 << 8) != 0 {
+        words.extend_from_slice(&[
+            0xd2800024, 0xf8240020, 0x91000400, 0x91000404, 0xc8a07c24, 0xa9401424, 0x91000486,
+            0xaa0503e7, 0x48247c26, 0xf9400020,
+        ]);
+        expected += 3;
+        memory_instructions += 5;
+    }
+    if host.hwcap & (1 << 15) != 0 {
+        words.extend_from_slice(&[0xf8bfc020, 0x91000400, 0xc89ffc20]);
+        expected += 1;
+        memory_instructions += 2;
+    }
+    if host.hwcap & (1 << 26) != 0 {
+        words.extend_from_slice(&[0xd9400020, 0x91000400, 0xd9000020]);
+        expected += 1;
+        memory_instructions += 2;
+    }
+    words.push(0xd4000001);
     let data_len = (PAGE_SIZE as usize).max(trames_memory::host_mapping_granule());
     let mut memory = Memory::default();
     memory
@@ -232,20 +258,20 @@ fn memory_probe() -> Result<(), String> {
     cpu.set_x(1, 0x10000);
     let mut engine = <Cpu as Backend>::Engine::default();
     let outcome = cpu.run(&mut engine, &mut memory, 64);
-    if !matches!(outcome, SliceOutcome::Syscall { instructions: 16 })
-        || cpu.x(0) != 44
-        || cpu.pc() != 0x1040
-        || memory.read_u64(0x10000).map_err(|e| e.to_string())? != 44
+    if !matches!(outcome, SliceOutcome::Syscall { instructions } if instructions == words.len() as u64)
+        || cpu.x(0) != expected
+        || cpu.pc() != 0x1000 + 4 * words.len() as u64
+        || memory.read_u64(0x10000).map_err(|e| e.to_string())? != expected
         || engine.stats.fallback_instructions != 0
-        || engine.memory_stats().instructions != 8
-        || engine.memory_stats().hardware != 6
-        || engine.memory_stats().direct != 6
+        || engine.memory_stats().instructions != memory_instructions
+        || engine.memory_stats().hardware != memory_instructions - 2
+        || engine.memory_stats().direct != memory_instructions - 2
         || engine.compilation_stats().address_reuses == 0
         || engine.memory_stats().staged != 0
         || engine.memory_stats().fused_entries != 1
     {
         return Err(format!(
-            "native scalar/pair/ordered/barrier memory probe: {outcome:?}"
+            "native scalar/pair/ordered/LSE/RCpc memory probe: {outcome:?}"
         ));
     }
     for (i, word) in words.iter().enumerate() {
