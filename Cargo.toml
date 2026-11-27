@@ -1,0 +1,19 @@
+[workspace]
+resolver = "2"
+members = ["crates/trames-android-core"]
+exclude = ["runtime"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.101"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/project-trames/trames-android"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[profile.release]
+lto = "thin"
+panic = "abort"
+overflow-checks = true

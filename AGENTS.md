@@ -1,0 +1,64 @@
+# 工程原则
+
+## Guest 内存、并发与原生函数
+
+以下原则来自项目所有者 2026-10-14 与 2026-10-20 的要求：
+
+- 原生函数与 CPU 解释器使用统一的 guest 内存访问、权限和并发模型。
+  减少重复地址转换、权限检查和借用；原生执行不额外叠加权限策略。
+- 保留原函数的线程安全责任。对于原本线程不安全的函数，不额外添加
+  算法级或全局锁来让它线程安全。允许真机 CPU 模型允许的竞态结果随
+  运行变化；不创造 guest 竞态错误码，也不保证确定性的操作获胜顺序。
+- guest 和主要宿主同为 AArch64；普通访存优先利用宿主 ARM 的原子性和
+  弱内存顺序。不为普通读写、额度或元数据维护额外模拟更强的一致性，
+  不叠加已由硬件或现有借用边界覆盖的检查、屏障和同步。
+- 原算法已有的锁、原子操作，以及 CPU 原子性和内存次序要求应保留。
+  底层访存同步不应把整个函数或原生调用串行化。
+- 原生函数优先在执行 guest 的同一宿主线程运行；短系统调用逐步采用相同原则。
+  只对实际共享的资源及必要的状态变更同步，避免把正常调用转交协调线程。
+  选择并发机制时，对照共享内存加对象级锁/原子操作、现有 worker 之间的消息队列/
+  总线与原版协调器三条路径；消息组不额外创建协调/资源服务线程。区分通信成本、
+  资源处理及全体暂停成本，不凭线程数量推断性能。
+- 生产并发路径优先直接共享资源；单字段计数、状态位等能用原子表达时优先原子，
+  多字段不变量按对象同步。只在实际同步操作需要时使用 acquire/release，不添加普通
+  访存屏障。不引入忙等/轮询消息总线或新的协调/服务线程；阻塞任务应交还执行槽。
+- 生产代码允许受控的 unsafe Rust/C。遇到疑似未定义行为，应具体分析
+  它会影响什么，包括 guest 状态、宿主内存、其他线程和编译器变换，
+  不仅凭 unsafe 或 UB 标签否定实现。若实际影响可限定在允许的 guest
+  结果内、宿主边界仍有效，可以采用相应底层实现并记录其编译器和架构
+  条件。无法界定后果的 UB，或一次运行未出问题，不能作为无害的依据。
+
+现有实现和限制见 [区域访存](runtime/docs/architecture/region-memory.md) 与
+[原生 allocator](runtime/docs/architecture/native-allocator.md)。
+
+## 验证与构建
+
+- 同时支持 Apple 与 Linux 宿主。共享实现复用 Runtime 现有的平台无关接口；
+  Apple 专用类型、API、依赖和链接项通过已有 target cfg／编译开关隔离，
+  与新提交保持统一。涉及平台路径的改动同时检查 Linux 与 Apple 构建。
+
+- 按改动范围验证；代码未变的通过结果直接复用，只重跑受影响项目和失败项。
+- 不因文档、记录或测试等待方式的调整重复触发完整 CPU、Linux、网络和图形验收。
+- 完整检查留到合入或正式发版节点。测试 IPA 可以使用已验证且源码未变的 guest 产物。
+
+## Development flow
+
+- Keep one development line per repository on `main`. Merge validated changes
+  promptly; do not maintain stacked or parallel long-lived draft PRs. If repository
+  rules require a PR, keep it short-lived and target `main`.
+- After completing and validating changes, commit and push them directly to
+  `main`, including paired runtime pins. Do not leave validated work local-only
+  unless the owner explicitly asks to hold the push.
+- Preserve tested commit identities and paired runtime pins when integrating.
+  Prefer fast-forward integration; do not rewrite published history for cleanup.
+
+## Android execution and development host
+
+- Android tools, SDK/NDK/JDK, emulator and device work run on Windows. Do not
+  provision them on the Mac; keep local builds small and reuse existing caches.
+- JIT is opt-in at compile time. Interpreter/iPad dependency graphs must not
+  depend on the JIT crate or executable memory allocator.
+- Never modify loaded guest executable bytes. Native code uses a separate
+  bounded W^X cache; keep guest TLS separate from host TLS/x18.
+- JNI is an application/control boundary, never a per-instruction bridge.
+- Distinguish cross-builds, Linux native JIT tests and real Android app-UID tests.

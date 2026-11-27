@@ -1,0 +1,47 @@
+name: Android
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  windows-build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: recursive }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - name: Install Android build packages on Windows
+        shell: pwsh
+        run: |
+          & "$env:ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.bat" "platforms;android-37" "build-tools;36.0.0" "ndk;28.2.13676358" "cmake;3.22.1"
+          if ($LASTEXITCODE -ne 0) { throw "SDK package installation failed" }
+      - name: Check compile-time interpreter-only configuration
+        shell: pwsh
+        run: ./scripts/build.ps1 -NativeOnly -InterpreterOnly
+      - name: Build JIT core and non-debuggable validation APKs
+        shell: pwsh
+        run: ./scripts/build.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trames-android-validation
+          path: |
+            app/build/outputs/apk/validation/*.apk
+            app/build/outputs/apk/androidTest/validation/*.apk
+          if-no-files-found: error
+          retention-days: 7
+  software-cpu:
+    strategy:
+      matrix:
+        os: [macos-15, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: recursive }
+      - run: rustup show
+      - run: cargo fmt --all --check
+      - run: python3 scripts/check-features.py
+      - run: python3 scripts/prepare-third-party-notices.py --check
+      - run: cargo test --locked -p trames-android-core
+      - run: cargo test --locked -p trames-android-core --features jit
+      - run: cargo test --manifest-path runtime/Cargo.toml --locked -p trames-jit --features native-aarch64

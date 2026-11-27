@@ -1,0 +1,25 @@
+[package]
+name = "trames-android-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["rlib", "staticlib"]
+
+[features]
+default = []
+jit = ["dep:trames-jit", "trames-jit/native-aarch64"]
+
+[dependencies]
+trames-engine = { path = "../../runtime/crates/trames-engine" }
+trames-execution = { path = "../../runtime/crates/trames-execution" }
+trames-interpreter = { path = "../../runtime/crates/trames-interpreter" }
+trames-memory = { path = "../../runtime/crates/trames-memory" }
+trames-jit = { path = "../../runtime/crates/trames-jit", optional = true, default-features = false }
+libc = "=0.2.190"
+
+[lints]
+workspace = true

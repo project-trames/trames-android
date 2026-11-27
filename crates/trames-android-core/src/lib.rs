@@ -1,0 +1,113 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+//! Android owns application lifecycle and JNI; CPU and Linux semantics belong
+//! to shared Runtime. There is no JNI crossing per guest instruction/syscall.
+use trames_engine::{Cpu as Backend, SliceOutcome};
+use trames_execution::Registers;
+use trames_memory::{Memory, Permissions, PAGE_SIZE};
+
+#[cfg(feature = "jit")]
+type Cpu = trames_jit::Cpu;
+#[cfg(not(feature = "jit"))]
+type Cpu = trames_interpreter::Cpu;
+
+#[repr(C)]
+#[derive(Default, Debug)]
+pub struct Probe {
+    pub schema: u32,
+    pub flags: u32,
+    pub instructions: u64,
+    pub host_page_size: u64,
+    pub guest_page_size: u64,
+    pub native_instructions: u64,
+}
+const _: () = assert!(std::mem::size_of::<Probe>() == 40);
+const _: () = assert!(std::mem::align_of::<Probe>() == 8);
+
+/// A real translated guest CPU probe, not full distro/session acceptance.
+pub fn probe() -> Result<Probe, String> {
+    let mut memory = Memory::default();
+    memory
+        .map(0x1000, PAGE_SIZE, Permissions::RW)
+        .map_err(|e| e.to_string())?;
+    // mov x0,#40; add x0,x0,#2; svc #0. Original RX guest code stays intact.
+    let words = [0xd2800500u32, 0x91000800, 0xd4000001];
+    for (i, word) in words.iter().enumerate() {
+        memory
+            .write_array(0x1000 + i as u64 * 4, word.to_le_bytes())
+            .map_err(|e| e.to_string())?;
+    }
+    memory
+        .protect(0x1000, PAGE_SIZE, Permissions::RX)
+        .map_err(|e| e.to_string())?;
+    let mut cpu = Cpu::new(0x1000, 0x2000);
+    let mut engine = <Cpu as Backend>::Engine::default();
+    let outcome = cpu.run(&mut engine, &mut memory, 64);
+    if !matches!(outcome, SliceOutcome::Syscall { instructions: 3 })
+        || cpu.x(0) != 42
+        || cpu.pc() != 0x100c
+    {
+        return Err(format!("CPU probe: {outcome:?}"));
+    }
+    for (i, word) in words.iter().enumerate() {
+        if memory
+            .fetch_u32(0x1000 + i as u64 * 4)
+            .map_err(|e| e.to_string())?
+            != *word
+        {
+            return Err("guest code changed".into());
+        }
+    }
+    #[cfg(feature = "jit")]
+    let (compiled, native) = (
+        trames_jit::NATIVE_COMPILED,
+        engine.stats.native_instructions,
+    );
+    #[cfg(not(feature = "jit"))]
+    let (compiled, native) = (false, 0u64);
+    if compiled && native != 2 {
+        return Err("JIT selected without native guest execution".into());
+    }
+    let page = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
+    if page <= 0 {
+        return Err("host page size unavailable".into());
+    }
+    Ok(Probe {
+        schema: 1,
+        flags: 1 | ((compiled as u32) << 1) | (((native > 0) as u32) << 2),
+        instructions: 3,
+        host_page_size: page as u64,
+        guest_page_size: PAGE_SIZE,
+        native_instructions: native,
+    })
+}
+
+/// # Safety
+/// `out` must point to a live, aligned, writable Probe owned by the caller.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn trames_android_probe(out: *mut Probe) -> i32 {
+    if out.is_null() {
+        return -1;
+    }
+    match probe() {
+        Ok(report) => {
+            unsafe {
+                out.write(report);
+            }
+            0
+        }
+        Err(_) => -2,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn guest_cpu_probe_keeps_original_instructions_and_exact_exit() {
+        let report = super::probe().unwrap();
+        assert_eq!(
+            (report.schema, report.instructions, report.guest_page_size),
+            (1, 3, 4096)
+        );
+        assert_ne!(report.flags & 1, 0);
+    }
+}
