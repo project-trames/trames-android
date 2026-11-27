@@ -31,8 +31,19 @@ blocking/retry behavior and return values. Android currently validates this exit
 with its CPU probe; full Session/terminal integration is still pending. Probe
 flag bit 3 proves a direct compiled exit without interpreter fallback.
 
-Translated guest memory accesses, conditional control flow and block linking
-remain later optimizations. CPU-only exit benchmarks do not include Linux syscall
+Same-page fixed-target blocks now use stable worker-private RW jump slots.
+Generated instructions stay RX and original guest bytes stay unchanged. Budget
+checks and existing live code epochs guard native chains; generation handles
+revoke incoming edges before eviction. Terminal SVC blocks keep a lightweight
+entry, and stable ordinary-block-to-SVC pairs can tail-jump without a full chain
+frame. Every SVC still returns to Runtime before further guest execution.
+
+Post-SVC re-entry caches the continuation address when code identity, guest PC
+and budget still match. Signal/restart redirection and unknown memory embeddings
+fall back to lookup. Probe flag bit 4 requires both real native links and cached
+syscall resumption.
+
+Translated guest memory accesses and conditional control flow remain later optimizations. CPU-only exit benchmarks do not include Linux syscall
 handler, filesystem/network, JNI or Android lifecycle costs.
 
 Next milestones:
@@ -50,3 +61,6 @@ pKVM/root/KVM devices and a separate guest kernel are not required for this path
 
 CPU-only measurements and source-bound validation for this optimization are
 recorded in [Runtime's JIT report](https://github.com/project-trames/trames-runtime/blob/f10a1597574d3b97b5d72b6c7d1d9d4a18ae5c8b/docs/validation/jit-syscall-registers-20261127.md).
+
+Same-page linking design and measured CPU-only before/after results are recorded
+in [Runtime's linking report](https://github.com/project-trames/trames-runtime/blob/eefc3b2d9efa46899d68248cae1249a2b2add349/docs/validation/jit-links-20261127.md).

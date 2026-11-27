@@ -29,8 +29,8 @@ pub fn probe() -> Result<Probe, String> {
     memory
         .map(0x1000, PAGE_SIZE, Permissions::RW)
         .map_err(|e| e.to_string())?;
-    // mov x0,#40; add x0,x0,#2; svc #0. Original RX guest code stays intact.
-    let words = [0xd2800500u32, 0x91000800, 0xd4000001];
+    // mov x0,#40; add x0,x0,#2; svc #0; b start. Guest bytes stay intact.
+    let words = [0xd2800500u32, 0x91000800, 0xd4000001, 0x17fffffd];
     for (i, word) in words.iter().enumerate() {
         memory
             .write_array(0x1000 + i as u64 * 4, word.to_le_bytes())
@@ -48,15 +48,6 @@ pub fn probe() -> Result<Probe, String> {
     {
         return Err(format!("CPU probe: {outcome:?}"));
     }
-    for (i, word) in words.iter().enumerate() {
-        if memory
-            .fetch_u32(0x1000 + i as u64 * 4)
-            .map_err(|e| e.to_string())?
-            != *word
-        {
-            return Err("guest code changed".into());
-        }
-    }
     #[cfg(feature = "jit")]
     let (compiled, native, direct) = (
         trames_jit::NATIVE_COMPILED,
@@ -72,6 +63,43 @@ pub fn probe() -> Result<Probe, String> {
     if compiled && (direct != 1 || engine.stats.fallback_instructions != 0) {
         return Err("SVC exit entered the interpreter".into());
     }
+    #[cfg(feature = "jit")]
+    let linked = if compiled {
+        // Resume from the post-SVC guest PC, committing a simulated return
+        // between entries. This warms the fixed branch and continuation slot.
+        for _ in 0..3 {
+            cpu.set_x(0, 1234);
+            if !matches!(
+                cpu.run(&mut engine, &mut memory, 64),
+                SliceOutcome::Syscall { instructions: 4 }
+            ) || cpu.pc() != 0x100c
+                || cpu.x(0) != 42
+            {
+                return Err("linked syscall continuation failed".into());
+            }
+        }
+        let links = engine.link_stats();
+        if links.linked_blocks == 0
+            || links.syscall_resumes == 0
+            || engine.stats.fallback_instructions != 0
+        {
+            return Err("JIT did not execute native links and cached syscall resumption".into());
+        }
+        true
+    } else {
+        false
+    };
+    #[cfg(not(feature = "jit"))]
+    let linked = false;
+    for (i, word) in words.iter().enumerate() {
+        if memory
+            .fetch_u32(0x1000 + i as u64 * 4)
+            .map_err(|e| e.to_string())?
+            != *word
+        {
+            return Err("guest code changed".into());
+        }
+    }
     let page = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
     if page <= 0 {
         return Err("host page size unavailable".into());
@@ -81,7 +109,8 @@ pub fn probe() -> Result<Probe, String> {
         flags: 1
             | ((compiled as u32) << 1)
             | (((native > 0) as u32) << 2)
-            | (((direct > 0) as u32) << 3),
+            | (((direct > 0) as u32) << 3)
+            | ((linked as u32) << 4),
         instructions: 3,
         host_page_size: page as u64,
         guest_page_size: PAGE_SIZE,
