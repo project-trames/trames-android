@@ -27,3 +27,5 @@ cargo test --locked -p trames-android-core --features jit
 ```
 
 GPL-3.0-or-later. Runtime and dependencies retain their own notices.
+
+Build and package evidence: [bootstrap validation](docs/validation/bootstrap-20261127.md).
