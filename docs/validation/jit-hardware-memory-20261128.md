@@ -36,3 +36,16 @@ short SVC tail execution is retained and checked. Shared writable pages do not
 receive the private-page speedup.
 
 [Runtime implementation, safety contracts, all 960 timed samples and source audit](https://github.com/project-trames/trames-runtime/blob/a96bacdc9f8ad3a49555108e6efa95817d87403b/docs/validation/jit-hardware-memory-20261128.md).
+
+CI receipts retain the tested implementation identities:
+
+- Runtime `a96bacd`: [ARM64 native JIT job](https://github.com/project-trames/trames-runtime/actions/runs/46041721341/job/140650814040)
+  passed strict Clippy, all 42 JIT tests and the CPU fixture.
+- Android `feed058`: [ARM64 CPU/core job](https://github.com/project-trames/trames-android/actions/runs/46041819268/job/140651157906)
+  passed compile-time feature checks, interpreter/JIT core probes and all Runtime
+  JIT tests. The [Windows packaging job](https://github.com/project-trames/trames-android/actions/runs/46041819268/job/140651157664)
+  is still running; Android Mac CI is queued. These are not counted as passes.
+- Runtime's broader Linux/Mac workspace jobs are still running at publication.
+  This receipt-only follow-up keeps the tested Runtime pin and skips another CI
+  run. Task-owned source/measurement binaries and the local Mac build cache are
+  removed after the frozen evidence is verified; shared dependency caches remain.
