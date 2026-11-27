@@ -35,7 +35,8 @@ adb shell am instrument -w org.trames.android.validation.test/org.trames.android
 The validation app is non-debuggable and uses a separate application ID with
 local debug signing. It is not the signed release product. Instrumentation
 rejects shell/root UIDs and requires two actual native guest instructions,
-correct syscall exit/accounting and unchanged guest bytes. Keep device model,
+a direct compiled syscall exit without interpreter fallback, correct accounting
+and unchanged guest bytes. Keep device model,
 Android build, app UID, host page size and instrumentation report as evidence.
 Repeat on both 4 KiB and 16 KiB Android hosts before claiming device acceptance.
 

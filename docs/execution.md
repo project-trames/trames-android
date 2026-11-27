@@ -18,10 +18,22 @@ FP/SIMD and exclusive reservations. Each worker owns a bounded RW-to-RX cache;
 invalidation reuses Runtime code-page identities. Native blocks are at most 64
 instructions and stay within one 4 KiB guest page. Host x18/TLS are untouched.
 
-The current translation strategy spills integer operands to a register frame.
-It demonstrates correctness and a reusable backend boundary; it is not a
-near-native performance claim. Register allocation, translated memory access,
-conditional control flow and block linking are later measured optimizations.
+Within each integer block, compile-time register allocation keeps values in
+caller-saved host registers. Only initial reads, dirty evictions and final dirty
+writebacks access the guest register frame. Host x18/TLS and callee-saved state
+are preserved. Guest memory operations still use the canonical interpreter.
+
+Guest SVC is decoded during compilation and terminates its block. After dirty
+registers are published, the backend advances guest PC once and returns
+`SliceOutcome::Syscall` directly; no guest SVC opcode is emitted into the host
+code cache. The shared Session dispatcher reads x8/x0-x5 and owns syscall policy,
+blocking/retry behavior and return values. Android currently validates this exit
+with its CPU probe; full Session/terminal integration is still pending. Probe
+flag bit 3 proves a direct compiled exit without interpreter fallback.
+
+Translated guest memory accesses, conditional control flow and block linking
+remain later optimizations. CPU-only exit benchmarks do not include Linux syscall
+handler, filesystem/network, JNI or Android lifecycle costs.
 
 Next milestones:
 
@@ -35,3 +47,6 @@ Next milestones:
    CPU/session acceptance. Keep product capabilities and performance measurable.
 
 pKVM/root/KVM devices and a separate guest kernel are not required for this path.
+
+CPU-only measurements and source-bound validation for this optimization are
+recorded in [Runtime's JIT report](https://github.com/project-trames/trames-runtime/blob/f10a1597574d3b97b5d72b6c7d1d9d4a18ae5c8b/docs/validation/jit-syscall-registers-20261127.md).

@@ -58,14 +58,19 @@ pub fn probe() -> Result<Probe, String> {
         }
     }
     #[cfg(feature = "jit")]
-    let (compiled, native) = (
+    let (compiled, native, direct) = (
         trames_jit::NATIVE_COMPILED,
         engine.stats.native_instructions,
+        engine.stats.direct_syscall_exits,
     );
     #[cfg(not(feature = "jit"))]
-    let (compiled, native) = (false, 0u64);
+    let (compiled, native, direct) = (false, 0u64, 0u64);
     if compiled && native != 2 {
         return Err("JIT selected without native guest execution".into());
+    }
+    #[cfg(feature = "jit")]
+    if compiled && (direct != 1 || engine.stats.fallback_instructions != 0) {
+        return Err("SVC exit entered the interpreter".into());
     }
     let page = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
     if page <= 0 {
@@ -73,7 +78,10 @@ pub fn probe() -> Result<Probe, String> {
     }
     Ok(Probe {
         schema: 1,
-        flags: 1 | ((compiled as u32) << 1) | (((native > 0) as u32) << 2),
+        flags: 1
+            | ((compiled as u32) << 1)
+            | (((native > 0) as u32) << 2)
+            | (((direct > 0) as u32) << 3),
         instructions: 3,
         host_page_size: page as u64,
         guest_page_size: PAGE_SIZE,
