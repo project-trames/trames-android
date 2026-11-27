@@ -230,6 +230,8 @@ fn memory_probe() -> Result<(), String> {
         || engine.stats.fallback_instructions != 0
         || engine.memory_stats().instructions != 4
         || engine.memory_stats().hardware != 2
+        || engine.memory_stats().direct != 2
+        || engine.compilation_stats().address_reuses == 0
         || engine.memory_stats().staged != 0
         || engine.memory_stats().fused_entries != 1
     {
