@@ -1,6 +1,7 @@
 # Native memory fusion acceptance — 2026-11-27
 
-Runtime pin: `5ca460c401745c4a631bbeacbb829e687598231f`.
+Runtime pin: `89c5abd57ce5cc8341f17fcea35a339b0f991595` (comment-only child of the
+measured/tested implementation `5ca460c401745c4a631bbeacbb829e687598231f`).
 
 Mixed scalar memory/integer blocks now stay within the native entry, including
 same-block backedges through budget/epoch guards. Each LDR/STR retains its own
@@ -38,3 +39,15 @@ The CPU-only measurements exclude actual syscall handlers, JNI and Android
 lifecycle. No host/KVM or application-level ranking is inferred.
 
 [Exact Runtime scope, safety, all samples, fixture and source/binary fingerprints](https://github.com/project-trames/trames-runtime/blob/5ca460c401745c4a631bbeacbb829e687598231f/docs/validation/jit-memory-fusion-20261127.md).
+
+CI receipts preserve the tested source identities; the final helper-contract
+comment and this paired record do not rerun code validation:
+
+- Runtime `5ca460c`: [ARM64 software-JIT job](https://github.com/project-trames/trames-runtime/actions/runs/46025036145/job/140594120305)
+  passes Clippy, all 36 JIT tests and the CPU fixture. Broader Linux/Mac workspace
+  jobs are still running when this record is published.
+- Android `59e0766`: [paired run 46025174090](https://github.com/project-trames/trames-android/actions/runs/46025174090)
+  passes ARM64 native CPU acceptance. Windows packaging is building and the Mac
+  runner is queued at publication; neither pending job is counted as a pass.
+- Local Mac CPU/core checks and the actual ARM64 core probe above already pass.
+  Task-owned source/build caches were removed after freezing the evidence.
