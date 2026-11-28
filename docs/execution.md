@@ -16,11 +16,11 @@ carry/conditional operations, multiply/divide, bitfields, shifts and fixed,
 conditional and register branches. CRC/FlagM/FlagM2/CSSC emit actual host opcodes
 when process-host HWCAP provides them. Native capability advertisement is now
 host-driven; there are no new software extension replacements or extra emulated
-extension state. Original guest memory is RX data, never patched. Remaining
-non-hint PAC/MTE compatibility operations retain the shared interpreter path
-where admitted. Fixed-width SIMD/FP, stateless crypto, common scalar/vector
+extension state. Original guest memory is RX data, never patched. Fixed-width
+SIMD/FP, stateless crypto, common scalar/vector
 memory and LSE, system controls, exclusive reservations and host-admitted
-special memory now execute natively. Unadvertised or absent host extensions are not supplied by
+special memory and the existing non-hint PAC/MTE compatibility profile now
+execute natively. Unadvertised or absent host extensions are not supplied by
 software emulation. Each worker owns a bounded RW-to-RX cache;
 invalidation reuses Runtime code-page identities. Native blocks are at most 64
 instructions and stay within one 4 KiB guest page. Host x18/TLS are untouched.
@@ -64,8 +64,8 @@ linked SUBS/B.NE countdown with exact retirement and NZCV. The JNI ABI remains
 40 bytes. The backend reuses existing task SP/NZCV state and never changes host
 SP or TLS; capability gates run during translation, not per instruction.
 
-Full host-ISA native coverage remains in progress. Non-hint PAC/MTE compatibility
-operations remain. Stateful extensions, full hardware PAC/MTE and Device-memory
+Full host-ISA native coverage remains in progress. Stateful extensions, full
+hardware PAC/MTE and Device-memory
 LS64 need explicit shared-CPU/memory ownership and remain unadvertised. CPU-only benchmarks exclude Linux syscall handlers,
 filesystem/network, JNI and Android lifecycle costs.
 
@@ -194,8 +194,8 @@ unadmitted forms in its declared fixed-width classes. The broader suite executes
 separates Linux-native, Apple/iPad isolation, Windows Android builds and outstanding
 app-UID/ART/16-KiB-device acceptance.
 
-The [remaining plan](https://github.com/project-trames/trames-runtime/blob/be8bfedfe1450c060d2fc5e03ab051605a7b1432/docs/roadmap/native-jit-coverage.md)
-now covers non-hint compatibility paths and stateful ABI work.
+The [remaining plan](https://github.com/project-trames/trames-runtime/blob/77a2f4716c2231cc3956eb8253b3dda7506f83a4/docs/roadmap/native-jit-coverage.md)
+now covers execution-epoch boundaries, stateful ABI ownership and device acceptance.
 SVE/SME and other unowned extensions are not software-emulated or advertised.
 
 The exclusive-memory category is now native at every single/pair width:
@@ -250,3 +250,32 @@ Matched ordinary-path controls show no consistent scalar-memory regression;
 their results do not establish a new integer speedup or MOPS throughput claim.
 Concurrent upstream integration preserved the tested CPU/memory source hashes;
 the merged Runtime execution-boundary and scoped strict Clippy checks pass.
+
+### Existing PAC/MTE compatibility category completion
+
+The whole existing non-hint compatibility category now avoids interpreter entry:
+PAC/AUT register and zero-modifier forms, XPAC/PACGA, authenticated branches and
+returns, LDRAA/LDRAB, pointer/tag arithmetic, LDG and STG/STZG/ST2G/STZ2G/STGP.
+This preserves the shared CPU's existing disabled-authentication and zero-tag
+policy. It does not use host PAC keys, advertise hardware MTE/PAC/BTI, or create
+per-task authentication/tag state. Register/address/data effects use native
+baseline instructions; tag-only permissions and translation keep the original
+Memory/View contract. Actual data accesses can fuse into protected native aliases.
+
+The core probe covers 75 representative forms at budgets 1/64, including high
+registers, SP, every branch family and every tag addressing mode. Its 150 programs
+compare complete state, canonical data, exact exits and unchanged text against
+the original shared interpreter and require zero fallback. Linux executes this
+probe through the native backend; Apple compiles the opt-in feature with native
+emission excluded. The JNI schema remains 1 / 40 bytes and existing flags remain
+unchanged. This CPU-only evidence is separate from real Android app-UID/ART and
+16-KiB-device acceptance, which remains outstanding.
+
+Runtime's independent LLVM matrix has 836 encodings and covers every existing
+family in serial, guarded and private modes, with fault/rollback, cross-page
+zeroing, reservation and mixed FP/register-pressure cases. The scoped
+[validation and CPU-only measurements](https://github.com/project-trames/trames-runtime/blob/77a2f4716c2231cc3956eb8253b3dda7506f83a4/docs/validation/jit-compatibility-20261128.md)
+also record the ordinary-path controls and the limitations of the measurements.
+The paired pin includes the separate AES CI correction: amd64 tests now verify
+the already-existing pre-effect fallback, while AArch64 tests require real AES
+execution and known vectors.

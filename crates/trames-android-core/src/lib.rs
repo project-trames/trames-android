@@ -111,6 +111,7 @@ pub fn probe() -> Result<Probe, String> {
         arithmetic_category_probe()?;
         exclusive_category_probe()?;
         special_memory_category_probe()?;
+        compatibility_category_probe()?;
         true
     } else {
         false
@@ -1023,6 +1024,144 @@ fn special_memory_category_probe() -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(feature = "jit")]
+fn compatibility_category_probe() -> Result<(), String> {
+    use trames_execution::Aarch64State;
+    let mut cases: Vec<(u32, bool)> = Vec::new();
+    for opcode in 0..8 {
+        cases.push((0xdac10000 | opcode << 10 | 17 << 5 | 18, false));
+        cases.push((0xdac123e0 | opcode << 10 | 18, false));
+    }
+    for word in [
+        0xdac143f2, 0xdac147f2, 0x9ac03000, 0x9ac01000, 0x9ac01400, 0x9ac00000, 0xbac00000,
+    ] {
+        cases.push((
+            if word & 0xff000000 == 0x9a000000 || word & 0xff000000 == 0xba000000 {
+                word | 29 << 16 | 17 << 5 | 18
+            } else {
+                word
+            },
+            false,
+        ));
+    }
+    for base in [0x91800000, 0xd1800000] {
+        cases.push((base | 1 << 16 | 15 << 10 | 17 << 5 | 18, false));
+    }
+    for base in [0xd71f0800, 0xd71f0c00, 0xd73f0800, 0xd73f0c00] {
+        cases.push((base | 17 << 5 | 29, true));
+    }
+    for base in [0xd61f081f, 0xd61f0c1f, 0xd63f081f, 0xd63f0c1f] {
+        cases.push((base | 17 << 5, true));
+    }
+    cases.extend([(0xd65f0bff, true), (0xd65f0fff, true)]);
+    for rn in [17, 31] {
+        for key in [0, 1 << 23] {
+            for writeback in [0, 1 << 11] {
+                cases.push((0xf8200400 | key | writeback | rn << 5 | 18, false));
+            }
+        }
+        cases.push((0xd9600000 | rn << 5 | 18, false)); // LDG
+        for opcode in 0..4 {
+            for mode in 1..4 {
+                cases.push((0xd9200000 | opcode << 22 | mode << 10 | rn << 5 | 18, false));
+            }
+        }
+        for mode in 1..4 {
+            cases.push((0x68000000 | mode << 23 | 29 << 10 | rn << 5 | 18, false));
+        }
+    }
+    for (word, branch) in cases {
+        let words = if branch {
+            vec![word, 0xd4000001]
+        } else {
+            vec![word, word, 0xd4000001]
+        };
+        for budget in [1, 64] {
+            let make = || -> Result<Memory, String> {
+                let mut m = Memory::default();
+                m.map(0x1000, PAGE_SIZE, Permissions::RW)
+                    .map_err(|e| e.to_string())?;
+                for (i, word) in words.iter().enumerate() {
+                    m.write_array(0x1000 + i as u64 * 4, word.to_le_bytes())
+                        .map_err(|e| e.to_string())?;
+                }
+                m.protect(0x1000, PAGE_SIZE, Permissions::RX)
+                    .map_err(|e| e.to_string())?;
+                m.map(0x10000, 0x10000, Permissions::RW)
+                    .map_err(|e| e.to_string())?;
+                m.write(0x10000, &[0x83; 16384])
+                    .map_err(|e| e.to_string())?;
+                Ok(m)
+            };
+            let mut m = make()?;
+            let mut reference_memory = make()?;
+            let mut state = Aarch64State {
+                pc: 0x1000,
+                sp: 0xa5aa_0000_0001_0000,
+                nzcv: 0xb,
+                tpidr_el0: 123,
+                tpidr2_el0: 456,
+                fpsr: 0x10,
+                ..Default::default()
+            };
+            state.registers = std::array::from_fn(|i| 0xa50f_1234_5678_0000 + i as u64);
+            state.vectors = [u128::MAX / 3; 32];
+            state.registers[17] = 0xa5aa_0000_0001_0000;
+            if branch {
+                state.registers[17] = 0xa5aa_0000_0000_1004;
+                state.registers[30] = state.registers[17];
+            }
+            let mut cpu = Cpu::new(0, 0);
+            let mut reference = trames_interpreter::Cpu::new(0, 0);
+            cpu.restore_architectural_state(&state);
+            reference.restore_architectural_state(&state);
+            let mut engine = <Cpu as Backend>::Engine::default();
+            let mut total = 0;
+            let mut exited = false;
+            for _ in 0..8 {
+                let actual = cpu.run(&mut engine, &mut m, budget);
+                let expected = reference.run_slice(&mut reference_memory, budget);
+                if format!("{actual:?}") != format!("{expected:?}")
+                    || cpu.architectural_state() != reference.architectural_state()
+                    || cpu.fault_retired() != reference.fault_retired()
+                {
+                    return Err(format!(
+                        "compatibility probe {word:x}: {actual:?}/{expected:?}"
+                    ));
+                }
+                match actual {
+                    SliceOutcome::Yield { instructions } => total += instructions,
+                    SliceOutcome::Syscall { instructions } => {
+                        total += instructions;
+                        exited = true;
+                        break;
+                    }
+                    other => return Err(format!("compatibility probe unexpected exit: {other:?}")),
+                }
+            }
+            if !exited
+                || total != words.len() as u64
+                || engine.stats.fallback_instructions != 0
+                || m.read_array::<4096>(0x10000).map_err(|e| e.to_string())?
+                    != reference_memory
+                        .read_array::<4096>(0x10000)
+                        .map_err(|e| e.to_string())?
+            {
+                return Err(format!("compatibility probe progress/memory {word:x}"));
+            }
+            for (i, original) in words.iter().enumerate() {
+                if m.fetch_u32(0x1000 + i as u64 * 4)
+                    .map_err(|e| e.to_string())?
+                    != *original
+                {
+                    return Err("compatibility probe modified guest text".into());
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// # Safety
 /// `out` must point to a live, aligned, writable Probe owned by the caller.
 #[unsafe(no_mangle)]
@@ -1043,6 +1182,13 @@ pub unsafe extern "C" fn trames_android_probe(out: *mut Probe) -> i32 {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "jit")]
+    #[test]
+    fn compatibility_probe_preserves_the_existing_profile_without_interpreter_fallback() {
+        if trames_jit::NATIVE_COMPILED {
+            super::compatibility_category_probe().unwrap();
+        }
+    }
     #[cfg(feature = "jit")]
     #[test]
     fn special_memory_probe_uses_only_host_admitted_native_stages() {
