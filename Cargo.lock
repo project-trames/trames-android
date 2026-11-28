@@ -166,6 +166,7 @@ dependencies = [
  "libc",
  "trames-engine",
  "trames-execution",
+ "trames-host-compute",
  "trames-interpreter",
  "trames-memory",
 ]

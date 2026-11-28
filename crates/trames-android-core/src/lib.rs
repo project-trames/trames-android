@@ -103,6 +103,7 @@ pub fn probe() -> Result<Probe, String> {
     #[cfg(feature = "jit")]
     let memory_native = if compiled {
         memory_probe()?;
+        vector_probe()?;
         true
     } else {
         false
@@ -281,6 +282,71 @@ fn memory_probe() -> Result<(), String> {
             != *word
         {
             return Err("native memory probe changed guest code".into());
+        }
+    }
+    Ok(())
+}
+
+#[cfg(feature = "jit")]
+fn vector_probe() -> Result<(), String> {
+    let mut words = vec![
+        0x1e6e1001u32,
+        0x1e601000,
+        0x1e612800,
+        0x1e610800,
+        0x9e780000,
+        0xd2800023,
+        0x9e670062,
+        0x4ee28442,
+        0x9e660044,
+        0x1e61281f,
+        0x9e6603e5,
+    ];
+    let half = trames_jit::host_features()
+        .ok_or("native profile missing")?
+        .hwcap
+        & (1 << 9)
+        != 0;
+    if half {
+        words.extend_from_slice(&[0x52878006, 0x1ee700c3, 0x1ee32863, 0x1ee60066]);
+    }
+    words.push(0xd4000001);
+    let mut m = Memory::default();
+    m.map(0x1000, PAGE_SIZE, Permissions::RW)
+        .map_err(|e| e.to_string())?;
+    for (i, w) in words.iter().enumerate() {
+        m.write_array(0x1000 + 4 * i as u64, w.to_le_bytes())
+            .map_err(|e| e.to_string())?;
+    }
+    m.protect(0x1000, PAGE_SIZE, Permissions::RX)
+        .map_err(|e| e.to_string())?;
+    let mut c = Cpu::new(0x1000, 0);
+    let mut e = <Cpu as Backend>::Engine::default();
+    let out = c.run(&mut e, &mut m, 64);
+    let state = c.architectural_state();
+    if !matches!(out,SliceOutcome::Syscall{instructions} if instructions==words.len() as u64)
+        || c.pc() != 0x1000 + 4 * words.len() as u64
+        || c.x(0) != 3
+        || c.x(4) != 2
+        || c.x(5) != 4f64.to_bits()
+        || half && c.x(6) != 0x4000
+        || state.vectors[0] != 3f64.to_bits() as u128
+        || state.vectors[2] != 2
+        || state.vectors[31] != 4f64.to_bits() as u128
+        || state.fpsr != 0
+        || e.stats.fallback_instructions != 0
+        || e.stats.native_instructions != words.len() as u64 - 1
+        || e.link_stats().entries != 1
+        || e.memory_stats().instructions != 0
+    {
+        return Err(format!("native FP/NEON probe: {out:?}"));
+    }
+    for (i, w) in words.iter().enumerate() {
+        if m.fetch_u32(0x1000 + 4 * i as u64)
+            .map_err(|e| e.to_string())?
+            != *w
+        {
+            return Err("FP probe changed guest code".into());
         }
     }
     Ok(())

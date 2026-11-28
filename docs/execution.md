@@ -103,3 +103,10 @@ Native hits have no new software alignment preflight, ordinary fence or global
 lock; ISA admission and reserved-register allocation run in the cold compiler.
 The full paired measurements and platform checks are recorded in
 [Runtime's LSE/RCpc report](https://github.com/project-trames/trames-runtime/blob/a4fe0eb0f744987bd0e8b315567ce3663aaff0c1/docs/validation/jit-lse-rcpc-20261128.md).
+
+The native CPU probe also requires FP/NEON arithmetic and integer conversion,
+real V31, preserved canonical vector values, zero fallback and one native entry.
+Scalar FP16 arithmetic is included when admitted by the host. Register allocation
+runs in the cold compiler; existing host FP control/status is switched once per
+entry. Vector memory fusion and remaining SIMD families are still pending.
+[FP/NEON implementation and measurements](https://github.com/project-trames/trames-runtime/blob/05c4fc1d1065d1d8fdde3e1fd52a9ce90a31b89d/docs/validation/jit-fp-neon-20261128.md).
