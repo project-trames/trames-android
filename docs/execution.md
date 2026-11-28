@@ -203,7 +203,7 @@ unadmitted forms in its declared fixed-width classes. The broader suite executes
 separates Linux-native, Apple/iPad isolation, Windows Android builds and outstanding
 app-UID/ART/16-KiB-device acceptance.
 
-The [remaining plan](https://github.com/project-trames/trames-runtime/blob/dcdf3218cebed423a6466eca59b4a11d118e1eee/docs/roadmap/native-jit-coverage.md)
+The [remaining plan](https://github.com/project-trames/trames-runtime/blob/bf8e801e09b43d9d04467cf2ca14711811da2d6a/docs/roadmap/native-jit-coverage.md)
 now covers generic encoding fallback, stateful ABI ownership and device acceptance.
 SVE/SME and other unowned extensions are not software-emulated or advertised.
 
@@ -341,3 +341,33 @@ the expected baseline failure and matched CPU-only controls. Abstract ordered
 and atomic loops are approximately 1.99x/1.50x faster than their previous JIT
 fallback paths. This does not establish equivalent application speedups, positive
 LSE128/LOR hardware acceptance or real Android app-UID/ART/16-KiB-device acceptance.
+
+### Base scalar integer decoding and fault completion
+
+The integer compiler now uses a pure cold decoder for all existing scalar
+forms. It preserves the original native instructions and allocator. SMULH/UMULH
+accept every hardware-ignored Ra value in the shared interpreter and native JIT;
+translation selects canonical ZR without reading an unused guest register.
+Untranslated scalar primary groups 5/8/9/13 now cache their original instruction
+fault directly, using existing code identity/page revalidation. Other primary
+groups keep their generic entry until their own complete audit. No new CPU bank,
+per-instruction preflight, software ISA model, JNI transition or guest-code patch
+is introduced.
+
+Runtime's [category acceptance](https://github.com/project-trames/trames-runtime/blob/bf8e801e09b43d9d04467cf2ca14711811da2d6a/docs/validation/jit-scalars-20261128.md)
+records a 1,048,576-selector LLVM audit with no invalid/missing scalar admissions,
+582,023 original interpreter fault checks, 102,472 native execution selectors,
+alias/pressure/slice/fault-invalidation tests and two expected baseline failures.
+Actual ARM64 hardware separately verifies all ignored high-multiply fields.
+838 before/after generated programs are byte-identical; the existing native
+layouts and ordinary/SVC controls are retained.
+
+The core probe checks all 21 scalar forms, every signed/unsigned ignored Ra value,
+host-admitted flag/CSSC additions and cached invalid encodings. This host executes
+264 valid programs at budgets 1/3/64 plus cold/warm fault programs. The probe
+requires complete reference state/retirement, zero successful fallback and
+unchanged text; Runtime's traced provider separately proves no interpreter fault
+entry. Core default 1 / JIT 6 tests and scoped strict lint pass on Linux/Apple.
+JNI schema 1 / 40 bytes and flags remain unchanged. Real Android app-UID/ART,
+large-page devices and positive unavailable-extension hardware remain separate
+acceptance work; Android tools remain on Windows.

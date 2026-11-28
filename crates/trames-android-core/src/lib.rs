@@ -7,6 +7,8 @@ use trames_memory::{Memory, Permissions, PAGE_SIZE};
 
 #[cfg(feature = "jit")]
 mod abstract_memory_probe;
+#[cfg(feature = "jit")]
+mod scalar_category_probe;
 
 #[cfg(feature = "jit")]
 type Cpu = trames_jit::Cpu;
@@ -117,6 +119,7 @@ pub fn probe() -> Result<Probe, String> {
         compatibility_category_probe()?;
         execution_boundary_probe()?;
         abstract_memory_probe::run()?;
+        scalar_category_probe::run()?;
         true
     } else {
         false
@@ -1286,6 +1289,13 @@ pub unsafe extern "C" fn trames_android_probe(out: *mut Probe) -> i32 {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "jit")]
+    #[test]
+    fn scalar_category_preserves_all_ignored_high_multiply_fields_and_fault_boundaries() {
+        if trames_jit::NATIVE_COMPILED {
+            super::scalar_category_probe::run().unwrap();
+        }
+    }
     #[cfg(feature = "jit")]
     #[test]
     fn abstract_ordered_memory_keeps_original_fence_callbacks_without_fallback() {
