@@ -110,6 +110,7 @@ pub fn probe() -> Result<Probe, String> {
         system_category_probe()?;
         arithmetic_category_probe()?;
         exclusive_category_probe()?;
+        special_memory_category_probe()?;
         true
     } else {
         false
@@ -860,6 +861,168 @@ fn exclusive_category_probe() -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(feature = "jit")]
+fn special_memory_category_probe() -> Result<(), String> {
+    let caps = trames_jit::host_features().ok_or("native special-memory profile missing")?;
+    for base in [0x19000400u32, 0x1d000400, 0x19c00400] {
+        let set = base == 0x19c00400;
+        for options in 0..if set { 4 } else { 16 } {
+            let words: [u32; 4] = std::array::from_fn(|stage| {
+                if stage == 3 {
+                    0xd4000001
+                } else {
+                    base | options << 12
+                        | (stage as u32) << if set { 14 } else { 22 }
+                        | (17 << 16)
+                        | (29 << 5)
+                        | 18
+                }
+            });
+            for budget in [1, 64] {
+                let mut memory = Memory::default();
+                memory
+                    .map(0x1000, PAGE_SIZE, Permissions::RW)
+                    .map_err(|e| e.to_string())?;
+                for (i, word) in words.iter().enumerate() {
+                    memory
+                        .write_array(0x1000 + i as u64 * 4, word.to_le_bytes())
+                        .map_err(|e| e.to_string())?;
+                }
+                memory
+                    .protect(0x1000, PAGE_SIZE, Permissions::RX)
+                    .map_err(|e| e.to_string())?;
+                memory
+                    .map(0x10000, 0x20000, Permissions::RW)
+                    .map_err(|e| e.to_string())?;
+                memory
+                    .write(0x10000, &[0x83; 16384])
+                    .map_err(|e| e.to_string())?;
+                memory
+                    .write(0x20000, &[0; 16384])
+                    .map_err(|e| e.to_string())?;
+                let mut cpu = Cpu::new(0x1000, 0);
+                cpu.set_x(18, 0x20003);
+                cpu.set_x(17, if set { 0x91 } else { 0x10005 });
+                cpu.set_x(29, 8197);
+                let mut engine = <Cpu as Backend>::Engine::default();
+                if caps.hwcap2 & (1 << 43) == 0 {
+                    let out = cpu.run(&mut engine, &mut memory, budget);
+                    if !matches!(
+                        out,
+                        SliceOutcome::Fault(trames_engine::CpuFault::Instruction {
+                            pc: 0x1000,
+                            ..
+                        })
+                    ) || cpu.fault_retired() != 0
+                        || engine.stats.fallback_instructions != 0
+                    {
+                        return Err(format!(
+                            "unavailable MOPS entered an emulation path: {out:?}"
+                        ));
+                    }
+                    continue;
+                }
+                let mut retired = 0;
+                let mut exited = false;
+                for _ in 0..16 {
+                    match cpu.run(&mut engine, &mut memory, budget) {
+                        SliceOutcome::Yield { instructions } => retired += instructions,
+                        SliceOutcome::Syscall { instructions } => {
+                            retired += instructions;
+                            exited = true;
+                            break;
+                        }
+                        other => return Err(format!("native MOPS: {other:?}")),
+                    }
+                }
+                let mut data = [0; 8197];
+                memory.read(0x20003, &mut data).map_err(|e| e.to_string())?;
+                if !exited
+                    || retired != 4
+                    || cpu.pc() != 0x1010
+                    || cpu.x(29) != 0
+                    || data != [if set { 0x91 } else { 0x83 }; 8197]
+                    || memory.read_array::<3>(0x20000).map_err(|e| e.to_string())? != [0; 3]
+                    || memory.read_array::<4>(0x22008).map_err(|e| e.to_string())? != [0; 4]
+                    || engine.stats.fallback_instructions != 0
+                {
+                    return Err("MOPS progress, bytes, guard or retirement mismatch".into());
+                }
+                for (i, word) in words.iter().enumerate() {
+                    if memory
+                        .fetch_u32(0x1000 + i as u64 * 4)
+                        .map_err(|e| e.to_string())?
+                        != *word
+                    {
+                        return Err("MOPS modified guest text".into());
+                    }
+                }
+            }
+        }
+    }
+    for base in [0x19208000u32, 0x19201000, 0x19203000] {
+        for order in 0..4 {
+            let word = base | order << 22 | (30 << 16) | (17 << 5) | 18;
+            let mut memory = Memory::default();
+            memory
+                .map(0x1000, PAGE_SIZE, Permissions::RW)
+                .map_err(|e| e.to_string())?;
+            memory
+                .write_array(0x1000, word.to_le_bytes())
+                .map_err(|e| e.to_string())?;
+            memory
+                .write_array(0x1004, 0xd4000001u32.to_le_bytes())
+                .map_err(|e| e.to_string())?;
+            memory
+                .protect(0x1000, PAGE_SIZE, Permissions::RX)
+                .map_err(|e| e.to_string())?;
+            memory
+                .map(0x10000, 4 * PAGE_SIZE, Permissions::RW)
+                .map_err(|e| e.to_string())?;
+            let old = 0x0123456789abcdef_fedcba9876543210u128;
+            let input = 0xff00aa5500ff55aa_55aaff00aa5500ffu128;
+            memory
+                .write_array(0x10000, old.to_le_bytes())
+                .map_err(|e| e.to_string())?;
+            let mut cpu = Cpu::new(0x1000, 0);
+            cpu.set_x(17, 0x10000);
+            cpu.set_x(18, input as u64);
+            cpu.set_x(30, (input >> 64) as u64);
+            let mut engine = <Cpu as Backend>::Engine::default();
+            let out = cpu.run(&mut engine, &mut memory, 64);
+            if caps.hwcap2 & (1 << 47) == 0 {
+                if !matches!(
+                    out,
+                    SliceOutcome::Fault(trames_engine::CpuFault::Instruction { pc: 0x1000, .. })
+                ) || engine.stats.fallback_instructions != 0
+                {
+                    return Err(format!(
+                        "unavailable LSE128 entered an emulation path: {out:?}"
+                    ));
+                }
+            } else {
+                let expected = match base {
+                    0x19201000 => old & !input,
+                    0x19203000 => old | input,
+                    _ => input,
+                };
+                if !matches!(out, SliceOutcome::Syscall { instructions: 2 })
+                    || cpu.x(18) != old as u64
+                    || cpu.x(30) != (old >> 64) as u64
+                    || memory
+                        .read_array::<16>(0x10000)
+                        .map_err(|e| e.to_string())?
+                        != expected.to_le_bytes()
+                    || engine.stats.fallback_instructions != 0
+                {
+                    return Err(format!("native LSE128: {out:?}"));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// # Safety
 /// `out` must point to a live, aligned, writable Probe owned by the caller.
 #[unsafe(no_mangle)]
@@ -880,6 +1043,13 @@ pub unsafe extern "C" fn trames_android_probe(out: *mut Probe) -> i32 {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "jit")]
+    #[test]
+    fn special_memory_probe_uses_only_host_admitted_native_stages() {
+        if trames_jit::NATIVE_COMPILED {
+            super::special_memory_category_probe().unwrap();
+        }
+    }
     #[test]
     fn guest_cpu_probe_keeps_original_instructions_and_exact_exit() {
         let report = super::probe().unwrap();

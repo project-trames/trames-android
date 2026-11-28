@@ -17,10 +17,10 @@ conditional and register branches. CRC/FlagM/FlagM2/CSSC emit actual host opcode
 when process-host HWCAP provides them. Native capability advertisement is now
 host-driven; there are no new software extension replacements or extra emulated
 extension state. Original guest memory is RX data, never patched. Remaining
-special-memory and non-hint PAC/MTE compatibility operations retain the shared
-interpreter path where admitted. Fixed-width SIMD/FP, stateless crypto, common
-scalar/vector memory and LSE, system controls and exclusive reservations now
-execute natively. Unadvertised or absent host extensions are not supplied by
+non-hint PAC/MTE compatibility operations retain the shared interpreter path
+where admitted. Fixed-width SIMD/FP, stateless crypto, common scalar/vector
+memory and LSE, system controls, exclusive reservations and host-admitted
+special memory now execute natively. Unadvertised or absent host extensions are not supplied by
 software emulation. Each worker owns a bounded RW-to-RX cache;
 invalidation reuses Runtime code-page identities. Native blocks are at most 64
 instructions and stay within one 4 KiB guest page. Host x18/TLS are untouched.
@@ -64,10 +64,9 @@ linked SUBS/B.NE countdown with exact retirement and NZCV. The JNI ABI remains
 40 bytes. The backend reuses existing task SP/NZCV state and never changes host
 SP or TLS; capability gates run during translation, not per instruction.
 
-Full host-ISA native coverage remains in progress. Special memory (MOPS, LOR
-and explicitly owned LSE128/LS64 profiles) and non-hint PAC/MTE compatibility
-operations remain. Stateful extensions need real context-save ownership and
-remain unadvertised. CPU-only benchmarks exclude Linux syscall handlers,
+Full host-ISA native coverage remains in progress. Non-hint PAC/MTE compatibility
+operations remain. Stateful extensions, full hardware PAC/MTE and Device-memory
+LS64 need explicit shared-CPU/memory ownership and remain unadvertised. CPU-only benchmarks exclude Linux syscall handlers,
 filesystem/network, JNI and Android lifecycle costs.
 
 Next milestones:
@@ -195,8 +194,8 @@ unadmitted forms in its declared fixed-width classes. The broader suite executes
 separates Linux-native, Apple/iPad isolation, Windows Android builds and outstanding
 app-UID/ART/16-KiB-device acceptance.
 
-The [remaining plan](https://github.com/project-trames/trames-runtime/blob/08bc623868ab03599c5bd4be9b2b88c0874b71be/docs/roadmap/native-jit-coverage.md)
-now covers special memory, non-hint compatibility paths and stateful ABI work.
+The [remaining plan](https://github.com/project-trames/trames-runtime/blob/be8bfedfe1450c060d2fc5e03ab051605a7b1432/docs/roadmap/native-jit-coverage.md)
+now covers non-hint compatibility paths and stateful ABI work.
 SVE/SME and other unowned extensions are not software-emulated or advertised.
 
 The exclusive-memory category is now native at every single/pair width:
@@ -223,3 +222,31 @@ restores the memory helper's `native-code` cfg. Linux GNU, the CI musl GNU-C
 frontend and Apple each pass 213 network library tests; the iOS interpreter
 check passes. CPU/JIT implementation and Android probes are unchanged, so their
 passing acceptance is reused. See the [scoped validation](https://github.com/project-trames/trames-runtime/blob/f595ae2a78e81a316fb842dd093c8c5c1eee005a/docs/validation/jit-exclusive-ci-followup-20261128.md).
+
+### Special-memory category completion
+
+The special-memory category uses real host-admitted instructions: all 108
+MOPS CPYF/CPY/SET stages, LSE128 SWPP/LDCLRP/LDSETP with every ordering, and
+LDLAR/STLLR at every width. MOPS keeps hardware progress in the existing GPR/NZCV
+banks, bounded protected operands, exact stage/budget/fault behavior, and the
+original Memory/View permissions and reservation domain. Admission and operand
+allocation decisions are cold translation work. No guest executable bytes,
+host TLS/x18, JNI schema or probe flags change. Missing capabilities fault at
+the reached instruction; LS64 and MOPS SETG remain rejected without their
+Device-memory/allocation-tag contracts.
+
+The paired core probe checks all 36 MOPS option combinations at budgets 1/64,
+exact retirement, memory results, unchanged text and zero interpreter fallback;
+it also checks conditional LSE128 pair operations. Linux/Apple default and JIT
+core tests and strict lint pass. Actual ARM64 Linux passes 131 JIT tests in both
+Debug and Release, but exposes no MOPS/LSE128/LOR. A separately identified QEMU
+10.0.13 MOPS-positive model passes the native MOPS matrix and Android core probe;
+this is functional ISA evidence, not hardware throughput or Android app-UID/ART
+acceptance. Positive MOPS/LSE128/LOR hardware, Option-B/migration and real large-page
+Android acceptance remain outstanding. See the source-bound
+[special-memory validation](https://github.com/project-trames/trames-runtime/blob/be8bfedfe1450c060d2fc5e03ab051605a7b1432/docs/validation/jit-special-memory-20261128.md).
+
+Matched ordinary-path controls show no consistent scalar-memory regression;
+their results do not establish a new integer speedup or MOPS throughput claim.
+Concurrent upstream integration preserved the tested CPU/memory source hashes;
+the merged Runtime execution-boundary and scoped strict Clippy checks pass.
