@@ -17,8 +17,7 @@ conditional and register branches. CRC/FlagM/FlagM2/CSSC emit actual host opcode
 when process-host HWCAP provides them. Native capability advertisement is now
 host-driven; there are no new software extension replacements or extra emulated
 extension state. Original guest memory is RX data, never patched. Remaining
-instruction families retain the legacy interpreter path, including structure/lane
-SIMD and exclusive reservations. Common FP/NEON arithmetic, scalar/paired vector
+instruction families retain the legacy interpreter path, including remaining SIMD arithmetic and exclusive reservations. Common FP/NEON arithmetic, scalar/paired vector
 transfers and integer pairs now execute natively. Each worker owns a bounded RW-to-RX cache;
 invalidation reuses Runtime code-page identities. Native blocks are at most 64
 instructions and stay within one 4 KiB guest page. Host x18/TLS are untouched.
@@ -62,8 +61,8 @@ linked SUBS/B.NE countdown with exact retirement and NZCV. The JNI ABI remains
 40 bytes. The backend reuses existing task SP/NZCV state and never changes host
 SP or TLS; capability gates run during translation, not per instruction.
 
-Full host-ISA native coverage remains in progress. Structure/lane vector memory,
-remaining SIMD arithmetic and exclusive reservations are the next groups; stateful extensions need real
+Full host-ISA native coverage remains in progress. Remaining SIMD arithmetic
+and exclusive reservations are the next groups; stateful extensions need real
 context-save ownership. CPU-only benchmarks exclude Linux syscall handlers,
 filesystem/network, JNI and Android lifecycle costs.
 
@@ -123,3 +122,15 @@ Hardware hits stay inside the original FP scope; checked callbacks publish live
 registers and restore host FP control/status before entering Rust, then reload
 guest banks/status on return. JNI schema and feature flags remain unchanged.
 [Vector-memory implementation and measurements](https://github.com/project-trames/trames-runtime/blob/367358df0a0eb25394a4af3146d4ce0d7950690e/docs/validation/jit-vector-memory-20261128.md).
+
+
+The structure probe adds four-register LD1/ST1, interleaved LD4/ST4, LD4/ST4
+single lanes and LD4R broadcast. Each loop wraps V31 to V0, performs native NEON
+arithmetic, and verifies all output bytes and vectors, exact 257-instruction
+retirement, zero fallback/staging, at least 62/64 hardware/direct accesses,
+address-proof reuse and one fused entry. The compiler also covers LD/ST2/3,
+one-to-four-register lists, all B/H/S/D lane indices, LD1R..LD4R, and both immediate
+and X-register post-index writeback. Contiguous host-vector groups are arranged
+in the cold compiler. Native transfer/permute/broadcast behavior remains hardware
+owned. JNI schema/flags, iPad isolation and Windows-only Android tooling stay
+unchanged. [Runtime validation](https://github.com/project-trames/trames-runtime/blob/f66050968f3433d89698e87bf7d3d477f28e38b7/docs/validation/jit-structures-20261128.md).

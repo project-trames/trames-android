@@ -105,6 +105,7 @@ pub fn probe() -> Result<Probe, String> {
         memory_probe()?;
         vector_probe()?;
         vector_memory_probe()?;
+        structure_memory_probe()?;
         true
     } else {
         false
@@ -410,6 +411,75 @@ fn vector_memory_probe() -> Result<(), String> {
                 != *w
             {
                 return Err("vector-memory probe changed guest code".into());
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(feature = "jit")]
+fn structure_memory_probe() -> Result<(), String> {
+    for (load, store, width) in [
+        (0x4c40203fu32, 0x4c00203fu32, 64), // LD1/ST1, four Q registers
+        (0x4c40083f, 0x4c00083f, 64),       // LD4/ST4, interleaved 4S
+        (0x0d60a03f, 0x0d20a03f, 16),       // LD4/ST4, lane S[0]
+        (0x4d60e83f, 0x0d20a03f, 16),       // LD4R 4S / ST4 lane
+    ] {
+        let words = [
+            load, 0x4ea387ff, 0x4ea38400, 0x4ea38421, 0x4ea38442, store, 0xf1000442, 0x54ffff21,
+            0xd4000001,
+        ];
+        let mut m = Memory::default();
+        m.map(0x1000, PAGE_SIZE, Permissions::RW)
+            .map_err(|e| e.to_string())?;
+        let len = (PAGE_SIZE as usize).max(trames_memory::host_mapping_granule());
+        m.map(0x10000, len as u64, Permissions::RW)
+            .map_err(|e| e.to_string())?;
+        m.write(0x10000, &vec![0; len]).map_err(|e| e.to_string())?;
+        for (i, w) in words.iter().enumerate() {
+            m.write_array(0x1000 + 4 * i as u64, w.to_le_bytes())
+                .map_err(|e| e.to_string())?;
+        }
+        m.protect(0x1000, PAGE_SIZE, Permissions::RX)
+            .map_err(|e| e.to_string())?;
+        let mut c = Cpu::new(0x1000, 0);
+        c.set_x(1, 0x10000);
+        c.set_x(2, 32);
+        let mut state = c.architectural_state();
+        state.vectors[3] = 0x00000001000000010000000100000001;
+        c.restore_architectural_state(&state);
+        let mut e = <Cpu as Backend>::Engine::default();
+        let out = c.run(&mut e, &mut m, 512);
+        let mut bytes = [0; 64];
+        m.read(0x10000, &mut bytes[..width])
+            .map_err(|e| e.to_string())?;
+        let state = c.architectural_state();
+        let stats = e.memory_stats();
+        if !matches!(out, SliceOutcome::Syscall { instructions: 257 })
+            || c.pc() != 0x1024
+            || c.x(2) != 0
+            || !bytes[..width]
+                .chunks_exact(4)
+                .all(|v| v == 32u32.to_le_bytes())
+            || [31, 0, 1, 2]
+                .into_iter()
+                .any(|r| state.vectors[r] != 32 * 0x00000001000000010000000100000001)
+            || e.stats.fallback_instructions != 0
+            || stats.instructions != 64
+            || stats.staged != 0
+            || stats.hardware < 62
+            || stats.direct < 62
+            || stats.fused_entries != 1
+            || e.compilation_stats().address_reuses == 0
+        {
+            return Err(format!("native structure/lane/replicate probe: {out:?}"));
+        }
+        for (i, w) in words.iter().enumerate() {
+            if m.fetch_u32(0x1000 + 4 * i as u64)
+                .map_err(|e| e.to_string())?
+                != *w
+            {
+                return Err("structure probe changed guest code".into());
             }
         }
     }
