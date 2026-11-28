@@ -134,3 +134,16 @@ and X-register post-index writeback. Contiguous host-vector groups are arranged
 in the cold compiler. Native transfer/permute/broadcast behavior remains hardware
 owned. JNI schema/flags, iPad isolation and Windows-only Android tooling stay
 unchanged. [Runtime validation](https://github.com/project-trames/trames-runtime/blob/f66050968f3433d89698e87bf7d3d477f28e38b7/docs/validation/jit-structures-20261128.md).
+
+
+The category probe now also requires the complete baseline SIMD copy/immediate/
+permute category and every stateless crypto family admitted by the process host.
+It compares the complete result to an independent interpreter, exact retirement,
+zero fallback, one native entry and unchanged guest text. TBL/TBX use cold packed
+register groups, including V31 wrap; insertion and destructive crypto instructions
+retain the old destination. No per-instruction JNI bridge or new CPU state is
+introduced. Missing optional ISA is rejected in cold compilation, including
+untranslated BF16/FHM/FCMA/DotProd/I8MM/RDM/FP16/JSCVT/FRINT forms. LS64 waits for
+an owned HWCAP3/device-memory contract. See the
+[category report](https://github.com/project-trames/trames-runtime/blob/76c662beea2aaa93f074506a2b7fd8972f0d7c3a/docs/validation/jit-move-crypto-20261128.md) and
+[remaining category plan](https://github.com/project-trames/trames-runtime/blob/76c662beea2aaa93f074506a2b7fd8972f0d7c3a/docs/roadmap/native-jit-coverage.md).

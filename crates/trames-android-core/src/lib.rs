@@ -106,6 +106,7 @@ pub fn probe() -> Result<Probe, String> {
         vector_probe()?;
         vector_memory_probe()?;
         structure_memory_probe()?;
+        movement_crypto_probe()?;
         true
     } else {
         false
@@ -481,6 +482,97 @@ fn structure_memory_probe() -> Result<(), String> {
             {
                 return Err("structure probe changed guest code".into());
             }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(feature = "jit")]
+fn movement_crypto_probe() -> Result<(), String> {
+    let caps = trames_jit::host_features().ok_or("native profile missing")?;
+    let mut words: Vec<u32> = vec![
+        0x4e040cc0, 0x4e181cdf, 0x6e1c241e, 0x4e183fe4, 0x4f0226a1, 0x4f001421, 0x6f004441,
+        0x6e011800, 0x4e200820, 0x4e023802, 0x4e0263a0, 0x4e0273bf, 0x0e1c3c24, 0x4e0c2c25,
+    ];
+    for (word, cap) in [
+        (0x4e284820, 3),
+        (0x4e285820, 3),
+        (0x4e286820, 3),
+        (0x4e287820, 3),
+        (0x5e280820, 5),
+        (0x5e281820, 5),
+        (0x5e282820, 6),
+        (0x5e020020, 5),
+        (0x5e021020, 5),
+        (0x5e022020, 5),
+        (0x5e023020, 5),
+        (0x5e024020, 6),
+        (0x5e025020, 6),
+        (0x5e026020, 6),
+        (0x0e22e020, 1),
+        (0x4e22e020, 1),
+        (0x0ee2e020, 4),
+        (0x4ee2e020, 4),
+        (0xcec08020, 21),
+        (0xcec08420, 19),
+        (0xce628020, 21),
+        (0xce628420, 21),
+        (0xce628820, 21),
+        (0xce628c20, 17),
+        (0xce62c020, 18),
+        (0xce62c420, 18),
+        (0xce62c820, 19),
+        (0xce020c20, 17),
+        (0xce220c20, 17),
+        (0xce420c20, 18),
+        (0xce428020, 18),
+        (0xce429420, 18),
+        (0xce42a820, 18),
+        (0xce42bc20, 18),
+        (0xce823420, 17),
+    ] {
+        if caps.hwcap & (1 << cap) != 0 {
+            words.push(word);
+        }
+    }
+    words.push(0xd4000001);
+    let mut m = Memory::default();
+    m.map(0x1000, PAGE_SIZE, Permissions::RW)
+        .map_err(|e| e.to_string())?;
+    for (i, w) in words.iter().enumerate() {
+        m.write_array(0x1000 + 4 * i as u64, w.to_le_bytes())
+            .map_err(|e| e.to_string())?;
+    }
+    m.protect(0x1000, PAGE_SIZE, Permissions::RX)
+        .map_err(|e| e.to_string())?;
+    let mut rm = m.clone();
+    let mut c = Cpu::new(0x1000, 0);
+    let mut state = c.architectural_state();
+    for (i, v) in state.vectors.iter_mut().enumerate() {
+        *v = (u128::MAX / 33) * (i as u128 + 1);
+    }
+    state.registers[6] = 0x839af23d903e6811;
+    c.restore_architectural_state(&state);
+    let mut reference = trames_interpreter::Cpu::new(0x1000, 0);
+    reference.restore_architectural_state(&state);
+    let mut e = <Cpu as Backend>::Engine::default();
+    let out = c.run(&mut e, &mut m, 128);
+    let expected = reference.run_slice(&mut rm, 128);
+    if !matches!(out,SliceOutcome::Syscall{instructions} if instructions==words.len() as u64)
+        || !matches!(expected,SliceOutcome::Syscall{instructions} if instructions==words.len() as u64)
+        || c.architectural_state() != reference.architectural_state()
+        || e.stats.fallback_instructions != 0
+        || e.stats.native_instructions != words.len() as u64 - 1
+        || e.link_stats().entries != 1
+    {
+        return Err(format!("native movement/crypto category probe: {out:?}"));
+    }
+    for (i, w) in words.iter().enumerate() {
+        if m.fetch_u32(0x1000 + 4 * i as u64)
+            .map_err(|e| e.to_string())?
+            != *w
+        {
+            return Err("movement/crypto probe changed guest code".into());
         }
     }
     Ok(())
