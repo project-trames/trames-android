@@ -58,8 +58,8 @@ one instruction. The retry limit is selected by const specialization: one cold
 extra entry, then a cooperative yield if execution is invalidated again. Original
 slice custody, CPU/FP publication, memory loans and reservations are preserved;
 no per-instruction check, new state bank or code patch is added. Generic fallback
-remains for unrecognized encodings and ordered/atomic operations in unknown
-CpuMemory embeddings without the product Memory/View hardware-order contract.
+remains for unrecognized encodings. Ordered/atomic operations in unknown CpuMemory
+embeddings now use native fragments through their original callback contract.
 Checked memory helpers and staging do not themselves mean interpreter fallback.
 
 Post-SVC re-entry caches the continuation address when code identity, guest PC
@@ -203,8 +203,8 @@ unadmitted forms in its declared fixed-width classes. The broader suite executes
 separates Linux-native, Apple/iPad isolation, Windows Android builds and outstanding
 app-UID/ART/16-KiB-device acceptance.
 
-The [remaining plan](https://github.com/project-trames/trames-runtime/blob/e8d9d339e5a3d78db0f7e3410538a4d48d97c846/docs/roadmap/native-jit-coverage.md)
-now covers generic embedding/encoding fallback, stateful ABI ownership and device acceptance.
+The [remaining plan](https://github.com/project-trames/trames-runtime/blob/dcdf3218cebed423a6466eca59b4a11d118e1eee/docs/roadmap/native-jit-coverage.md)
+now covers generic encoding fallback, stateful ABI ownership and device acceptance.
 SVE/SME and other unowned extensions are not software-emulated or advertised.
 
 The exclusive-memory category is now native at every single/pair width:
@@ -314,3 +314,30 @@ CPU-only ordinary/SVC controls. Linux executes all four core JIT tests natively;
 Apple compiles native emission out. Default core tests, scoped strict lint and
 iPad dependency isolation pass. These checks do not replace Windows APK builds
 or real Android app-UID/ART/signal/16-KiB-device acceptance.
+
+### Abstract ordered/atomic memory category completion
+
+Unknown CpuMemory providers no longer need interpreter fallback for LDAR/STLR,
+LDAPR/LDAPUR/STLUR and signed forms, CAS/CASP, LSE RMW/store aliases, and host-
+admitted LSE128/LOR. Real native instructions run through the original read/write,
+atomic-update and fence callbacks. The cold compiler retains the canonical
+callback boundary even when the provider offers native aliases; product
+Memory/View keeps its existing direct hardware/fused path. No new CPU state,
+ordinary hot check, synchronization service or guest-text patch is introduced.
+
+The default ordered transports now respect the provider's original fence hooks;
+the final canonical write owns permission/fault/publication without a duplicate
+preflight. Conditional CAS publication and the existing reservation domain remain
+intact. The core probe adds up to 21 programs over seven baseline/host-admitted
+forms at budgets 1/3/64, comparing whole reference state/data/exits and original
+fence callbacks, with zero fallback and unchanged text. Linux executes all 21;
+Apple compiles native emission out. Core default 1 / JIT 5 tests and strict lint
+pass on both hosts. JNI schema 1 / 40 bytes and flags remain unchanged.
+
+Runtime's [category acceptance](https://github.com/project-trames/trames-runtime/blob/dcdf3218cebed423a6466eca59b4a11d118e1eee/docs/validation/jit-abstract-memory-20261128.md)
+records 795 independent LLVM encodings, 44,100 native whole-state/callback/fault
+programs on the actual host, reservation and missing-host rejection checks,
+the expected baseline failure and matched CPU-only controls. Abstract ordered
+and atomic loops are approximately 1.99x/1.50x faster than their previous JIT
+fallback paths. This does not establish equivalent application speedups, positive
+LSE128/LOR hardware acceptance or real Android app-UID/ART/16-KiB-device acceptance.
