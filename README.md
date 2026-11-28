@@ -8,7 +8,7 @@ Android SDK/NDK/JDK and device/emulator work belong on **Windows**. The Mac keep
 source and runs shared Rust checks; no Android toolchain or new VM is required.
 See [Windows setup](docs/windows.md) and [execution design](docs/execution.md).
 
-Current milestone: shared interpreter, opt-in ARM64 native integer blocks,
+Current milestone: shared interpreter, opt-in ARM64 JIT,
 JNI CPU probe, minimal application shell, and Windows APK build pipeline.
 The application currently checks the CPU backend. It does not yet launch a
 Linux distribution, terminal, systemd, Docker, graphics or multimedia sessions.

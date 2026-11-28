@@ -109,6 +109,7 @@ pub fn probe() -> Result<Probe, String> {
         movement_crypto_probe()?;
         system_category_probe()?;
         arithmetic_category_probe()?;
+        exclusive_category_probe()?;
         true
     } else {
         false
@@ -781,6 +782,79 @@ fn arithmetic_category_probe() -> Result<(), String> {
             != *w
         {
             return Err("arithmetic probe changed guest text".into());
+        }
+    }
+    Ok(())
+}
+
+#[cfg(feature = "jit")]
+fn exclusive_category_probe() -> Result<(), String> {
+    // All single widths and both pair widths. Each successful retry loop must
+    // retain original guest bytes and return through the shared syscall exit.
+    for (lr, sc, width) in [
+        (0x085ffc20u32, 0x0803fc20, 1),
+        (0x485ffc20, 0x4803fc20, 2),
+        (0x885ffc20, 0x8803fc20, 4),
+        (0xc85ffc20, 0xc803fc20, 8),
+        (0x887f8820, 0x88238820, 8),
+        (0xc87f8820, 0xc8238820, 16),
+    ] {
+        let words = [lr, 0x91000400, sc, 0xb5ffffa3, 0xd5033f5f, 0xd4000001];
+        let mut m = Memory::default();
+        m.map(0x1000, PAGE_SIZE, Permissions::RW)
+            .map_err(|e| e.to_string())?;
+        m.map(0x10000, 4 * PAGE_SIZE, Permissions::RW)
+            .map_err(|e| e.to_string())?;
+        m.write(0x10000, &[0; 32]).map_err(|e| e.to_string())?;
+        for (i, word) in words.iter().enumerate() {
+            m.write_array(0x1000 + 4 * i as u64, word.to_le_bytes())
+                .map_err(|e| e.to_string())?;
+        }
+        m.protect(0x1000, PAGE_SIZE, Permissions::RX)
+            .map_err(|e| e.to_string())?;
+        let mut c = Cpu::new(0x1000, 0);
+        c.set_x(1, 0x10000);
+        c.set_x(4, 0x55);
+        let mut e = <Cpu as Backend>::Engine::default();
+        let out = c.run(&mut e, &mut m, 4096);
+        let retired = match out {
+            SliceOutcome::Syscall { instructions } => instructions,
+            _ => return Err(format!("exclusive category: {out:?}")),
+        };
+        if c.x(3) != 0
+            || c.x(0) != 1
+            || retired < 6
+            || (retired - 6) % 4 != 0
+            || m.read_array::<1>(0x10000).map_err(|e| e.to_string())? != [1]
+            || m.read_array::<16>(0x10010).map_err(|e| e.to_string())? != [0; 16]
+            || e.stats.fallback_instructions != 0
+            || e.stats.native_instructions != retired - 1
+        {
+            return Err(format!("native exclusive width {width}: {out:?}"));
+        }
+        for (i, word) in words.iter().enumerate() {
+            if m.fetch_u32(0x1000 + 4 * i as u64)
+                .map_err(|e| e.to_string())?
+                != *word
+            {
+                return Err("exclusive probe changed guest text".into());
+            }
+        }
+        // Budgeted LR, native CLREX and a fresh engine share CPU reservation state.
+        c.set_pc(0x1000);
+        if !matches!(
+            c.run(&mut e, &mut m, 1),
+            SliceOutcome::Yield { instructions: 1 }
+        ) {
+            return Err("exclusive probe LR slice".into());
+        }
+        c.set_pc(0x1010);
+        c.run(&mut e, &mut m, 1);
+        c.set_pc(0x1008);
+        let mut fresh = <Cpu as Backend>::Engine::default();
+        c.run(&mut fresh, &mut m, 1);
+        if c.x(3) != 1 || fresh.stats.fallback_instructions != 0 {
+            return Err("exclusive probe CLREX handoff".into());
         }
     }
     Ok(())

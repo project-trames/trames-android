@@ -17,8 +17,11 @@ conditional and register branches. CRC/FlagM/FlagM2/CSSC emit actual host opcode
 when process-host HWCAP provides them. Native capability advertisement is now
 host-driven; there are no new software extension replacements or extra emulated
 extension state. Original guest memory is RX data, never patched. Remaining
-instruction families retain the legacy interpreter path, including remaining SIMD arithmetic and exclusive reservations. Common FP/NEON arithmetic, scalar/paired vector
-transfers and integer pairs now execute natively. Each worker owns a bounded RW-to-RX cache;
+special-memory and non-hint PAC/MTE compatibility operations retain the shared
+interpreter path where admitted. Fixed-width SIMD/FP, stateless crypto, common
+scalar/vector memory and LSE, system controls and exclusive reservations now
+execute natively. Unadvertised or absent host extensions are not supplied by
+software emulation. Each worker owns a bounded RW-to-RX cache;
 invalidation reuses Runtime code-page identities. Native blocks are at most 64
 instructions and stay within one 4 KiB guest page. Host x18/TLS are untouched.
 
@@ -61,9 +64,10 @@ linked SUBS/B.NE countdown with exact retirement and NZCV. The JNI ABI remains
 40 bytes. The backend reuses existing task SP/NZCV state and never changes host
 SP or TLS; capability gates run during translation, not per instruction.
 
-Full host-ISA native coverage remains in progress. Remaining SIMD arithmetic
-and exclusive reservations are the next groups; stateful extensions need real
-context-save ownership. CPU-only benchmarks exclude Linux syscall handlers,
+Full host-ISA native coverage remains in progress. Special memory (MOPS, LOR
+and explicitly owned LSE128/LS64 profiles) and non-hint PAC/MTE compatibility
+operations remain. Stateful extensions need real context-save ownership and
+remain unadvertised. CPU-only benchmarks exclude Linux syscall handlers,
 filesystem/network, JNI and Android lifecycle costs.
 
 Next milestones:
@@ -165,9 +169,9 @@ acceptance uses a 24-MHz counter; frequency is not hard-coded in production.
 [System category validation](https://github.com/project-trames/trames-runtime/blob/1ef4b02bdc53059abd15aadbba3f2dc67dea32ab/docs/validation/jit-system-20261128.md)
 records Linux native and Apple isolation results separately from Windows Android
 builds and outstanding app-UID/ART/16-KiB-device execution.
-The [current coverage plan](https://github.com/project-trames/trames-runtime/blob/1ef4b02bdc53059abd15aadbba3f2dc67dea32ab/docs/roadmap/native-jit-coverage.md)
-keeps remaining arithmetic, exclusives, special memory and compatibility/stateful
-extensions visible; this pin does not claim full native instruction coverage.
+At the system-category pin, the [coverage plan](https://github.com/project-trames/trames-runtime/blob/1ef4b02bdc53059abd15aadbba3f2dc67dea32ab/docs/roadmap/native-jit-coverage.md)
+listed arithmetic and exclusives before the subsequent category completions
+below. That pin did not claim full native instruction coverage.
 
 
 The fixed-width arithmetic category is now native: scalar SIMD, widening/
@@ -191,7 +195,25 @@ unadmitted forms in its declared fixed-width classes. The broader suite executes
 separates Linux-native, Apple/iPad isolation, Windows Android builds and outstanding
 app-UID/ART/16-KiB-device acceptance.
 
-The [remaining plan](https://github.com/project-trames/trames-runtime/blob/767b92efb81251861576cefdf676a8bb4f15a4e3/docs/roadmap/native-jit-coverage.md)
-now starts with exclusive reservations, followed by special memory and
-compatibility/stateful ABI work. SVE/SME and other unowned extensions are not
-software-emulated or advertised by this pin.
+The [remaining plan](https://github.com/project-trames/trames-runtime/blob/08bc623868ab03599c5bd4be9b2b88c0874b71be/docs/roadmap/native-jit-coverage.md)
+now covers special memory, non-hint compatibility paths and stateful ABI work.
+SVE/SME and other unowned extensions are not software-emulated or advertised.
+
+The exclusive-memory category is now native at every single/pair width:
+LDXR/LDAXR/LDXP/LDAXP, STXR/STLXR/STXP/STLXP and every CLREX option. Closed
+private windows keep the hardware monitor across native GPR lowering with no
+helper/frame traffic between LR and SC. Shared/open/sliced sequences use native
+fragments through the original Runtime reservation/ABA domain. The existing guest
+alignment constraint is admitted once at the window loan boundary; capability,
+encoding and allocation decisions remain cold. No additional extension state,
+global lock, JNI crossing or guest-text rewrite is introduced.
+
+The Android native probe now checks all single/pair widths, guest retries, exact
+retirement, native CLREX and a fresh-engine sliced handoff with zero fallback and
+unchanged code. JNI schema/flags stay unchanged. Runtime's
+[exclusive category validation](https://github.com/project-trames/trames-runtime/blob/08bc623868ab03599c5bd4be9b2b88c0874b71be/docs/validation/jit-exclusive-20261128.md)
+records 114 Linux Debug/Release JIT tests, independent LLVM encodings, exact real
+fault recovery and matched CPU-only measurements. Private single/pair retry loops
+are about 3.79×/3.85× faster than the previous JIT's interpreter-exclusive path;
+guarded shared loops are about 1.22× faster. Android app-UID/ART and 16-KiB device
+acceptance remain distinct from these Linux/Apple CPU probes.
