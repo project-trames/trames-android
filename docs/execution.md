@@ -217,3 +217,9 @@ fault recovery and matched CPU-only measurements. Private single/pair retry loop
 are about 3.79×/3.85× faster than the previous JIT's interpreter-exclusive path;
 guarded shared loops are about 1.22× faster. Android app-UID/ART and 16-KiB device
 acceptance remain distinct from these Linux/Apple CPU probes.
+
+The paired Runtime CI follow-up fixes a DNS reclaim test lifetime race and
+restores the memory helper's `native-code` cfg. Linux GNU, the CI musl GNU-C
+frontend and Apple each pass 213 network library tests; the iOS interpreter
+check passes. CPU/JIT implementation and Android probes are unchanged, so their
+passing acceptance is reused. See the [scoped validation](https://github.com/project-trames/trames-runtime/blob/f595ae2a78e81a316fb842dd093c8c5c1eee005a/docs/validation/jit-exclusive-ci-followup-20261128.md).
