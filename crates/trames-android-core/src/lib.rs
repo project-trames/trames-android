@@ -14,6 +14,8 @@ mod lut_probe;
 #[cfg(feature = "jit")]
 mod scalar_category_probe;
 #[cfg(feature = "jit")]
+mod system_encoding_probe;
+#[cfg(feature = "jit")]
 mod vector_encoding_probe;
 
 #[cfg(feature = "jit")]
@@ -128,6 +130,7 @@ pub fn probe() -> Result<Probe, String> {
         scalar_category_probe::run()?;
         control_category_probe::run()?;
         lut_probe::run()?;
+        system_encoding_probe::run()?;
         vector_encoding_probe::run()?;
         true
     } else {
@@ -1298,6 +1301,14 @@ pub unsafe extern "C" fn trames_android_probe(out: *mut Probe) -> i32 {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "jit")]
+    #[test]
+    fn system_encoding_probe_keeps_all_hints_native_and_unknown_accesses_out_of_the_interpreter() {
+        if trames_jit::NATIVE_COMPILED {
+            super::system_encoding_probe::run().unwrap();
+        }
+    }
+
     #[cfg(feature = "jit")]
     #[test]
     fn lut_probe_keeps_actual_host_instructions_and_rejects_absent_extensions() {
