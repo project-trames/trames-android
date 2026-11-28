@@ -108,6 +108,7 @@ pub fn probe() -> Result<Probe, String> {
         structure_memory_probe()?;
         movement_crypto_probe()?;
         system_category_probe()?;
+        arithmetic_category_probe()?;
         true
     } else {
         false
@@ -695,6 +696,92 @@ fn system_category_probe() -> Result<(), String> {
         || e.stats.fallback_instructions != 0
     {
         return Err("native trap/category opt-in probe failed".into());
+    }
+    Ok(())
+}
+
+#[cfg(feature = "jit")]
+fn arithmetic_category_probe() -> Result<(), String> {
+    let caps = trames_jit::host_features().ok_or("native arithmetic profile missing")?;
+    let mut words: Vec<u32> = (0..32)
+        .map(|r| 0x4ea01c00 | (r << 16) | (r << 5) | r)
+        .collect();
+    for (word, h, h2) in [
+        (0x0f0ba420, 2, 0),
+        (0x0e214800, 2, 0),
+        (0x0e22c020, 2, 0),
+        (0x4f0c9c20, 2, 0),
+        (0x6f720820, 2, 0),
+        (0x6f724820, 2, 0),
+        (0x4f72b820, 2, 0),
+        (0x5f7f0420, 2, 0),
+        (0x4ea1d820, 2, 0),
+        (0x4e20fc20, 2, 0),
+        (0x6ea1d820, 2, 0),
+        (0x4ea0fc20, 2, 0),
+        (0x4e31b820, 2, 0),
+        (0x6e214820, 2, 0),
+        (0x0e216820, 2, 0),
+        (0x4e217820, 2, 0),
+        (0x6f72d820, 1 << 12, 0),
+        (0x4e829420, 1 << 20, 0),
+        (0x4e82a420, 0, 1 << 13),
+        (0x6e42fc20, 0, 1 << 14),
+        (0x4e22ec20, 1 << 23, 0),
+        (0x6e82cc20, 1 << 14, 0),
+        (0x4e421420, 1 << 10, 0),
+        (0x9ee60027, 1 << 9, 0),
+        (0x1e7e0027, 1 << 13, 0),
+        (0x4e21e820, 0, 1 << 8),
+    ] {
+        if caps.hwcap & h == h && caps.hwcap2 & h2 == h2 {
+            words.push(word);
+        }
+    }
+    words.extend_from_slice(&[0x3dc0034c, 0x3d80074c, 0xd53b443c, 0xd4000001]);
+    let mut m = Memory::default();
+    m.map(0x1000, PAGE_SIZE, Permissions::RW)
+        .map_err(|e| e.to_string())?;
+    m.map(0x10000, 4 * PAGE_SIZE, Permissions::RW)
+        .map_err(|e| e.to_string())?;
+    for (i, w) in words.iter().enumerate() {
+        m.write_array(0x1000 + 4 * i as u64, w.to_le_bytes())
+            .map_err(|e| e.to_string())?;
+    }
+    m.protect(0x1000, PAGE_SIZE, Permissions::RX)
+        .map_err(|e| e.to_string())?;
+    let mut rm = m.clone();
+    let mut c = Cpu::new(0x1000, 0);
+    let mut r = trames_interpreter::Cpu::new(0x1000, 0);
+    let mut state = c.architectural_state();
+    state.registers[26] = 0x10ff8;
+    for (i, v) in state.vectors.iter_mut().enumerate() {
+        *v = (u128::MAX / 33) * (i as u128 + 1);
+    }
+    c.restore_architectural_state(&state);
+    r.restore_architectural_state(&state);
+    let mut e = <Cpu as Backend>::Engine::default();
+    let out = c.run(&mut e, &mut m, 256);
+    let reference = r.run_slice(&mut rm, 256);
+    if !matches!(out,SliceOutcome::Syscall{instructions} if instructions==words.len() as u64)
+        || !matches!(reference,SliceOutcome::Syscall{instructions} if instructions==words.len() as u64)
+        || c.architectural_state() != r.architectural_state()
+        || m.read_array::<32>(0x10ff8).map_err(|e| e.to_string())?
+            != rm.read_array::<32>(0x10ff8).map_err(|e| e.to_string())?
+        || e.stats.fallback_instructions != 0
+        || e.stats.native_instructions != words.len() as u64 - 1
+    {
+        return Err(format!(
+            "native complete arithmetic category probe: {out:?}"
+        ));
+    }
+    for (i, w) in words.iter().enumerate() {
+        if m.fetch_u32(0x1000 + 4 * i as u64)
+            .map_err(|e| e.to_string())?
+            != *w
+        {
+            return Err("arithmetic probe changed guest text".into());
+        }
     }
     Ok(())
 }

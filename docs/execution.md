@@ -168,3 +168,30 @@ builds and outstanding app-UID/ART/16-KiB-device execution.
 The [current coverage plan](https://github.com/project-trames/trames-runtime/blob/1ef4b02bdc53059abd15aadbba3f2dc67dea32ab/docs/roadmap/native-jit-coverage.md)
 keeps remaining arithmetic, exclusives, special memory and compatibility/stateful
 extensions visible; this pin does not claim full native instruction coverage.
+
+
+The fixed-width arithmetic category is now native: scalar SIMD, widening/
+narrowing and saturation, shifts/inserts, indexed multiply/add, reductions,
+reciprocal families, precision/scaled conversions, FP16/BF16/DotProd/I8MM/RDM/
+FCMA/FHM, JSCVT and FRINT32/64. All feature/encoding and register-allocation
+choices stay in the cold compiler. The existing guest vector bank and FP state
+are reused, with 24 caller-saved host vector registers and real low-register
+allocation for restricted indexed operands; no software ISA or new extension
+state is introduced. Host D8–D15, TLS, guest code and the native scalar ABI are
+preserved.
+
+The Android native arithmetic probe fills all 32 guest vectors, executes baseline
+and host-admitted extension families, then crosses checked memory callbacks. It
+requires complete interpreter-reference state/data, exact retirement and zero
+fallback, without changing JNI schema/flags. Runtime's independent encoding
+matrix has 68,214 admitted encodings, zero invalid admissions and no valid
+unadmitted forms in its declared fixed-width classes. The broader suite executes
+10,640 distinct forms and 7,129 aliased programs under pressure and FP controls.
+[Arithmetic validation](https://github.com/project-trames/trames-runtime/blob/767b92efb81251861576cefdf676a8bb4f15a4e3/docs/validation/jit-arithmetic-20261128.md)
+separates Linux-native, Apple/iPad isolation, Windows Android builds and outstanding
+app-UID/ART/16-KiB-device acceptance.
+
+The [remaining plan](https://github.com/project-trames/trames-runtime/blob/767b92efb81251861576cefdf676a8bb4f15a4e3/docs/roadmap/native-jit-coverage.md)
+now starts with exclusive reservations, followed by special memory and
+compatibility/stateful ABI work. SVE/SME and other unowned extensions are not
+software-emulated or advertised by this pin.
