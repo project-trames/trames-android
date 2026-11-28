@@ -53,6 +53,15 @@ revoke incoming edges before eviction. Terminal SVC blocks keep a lightweight
 entry, and stable ordinary-block-to-SVC pairs can tail-jump without a full chain
 frame. Every SVC still returns to Runtime before further guest execution.
 
+Changed execution epochs now revalidate/retry natively instead of interpreting
+one instruction. The retry limit is selected by const specialization: one cold
+extra entry, then a cooperative yield if execution is invalidated again. Original
+slice custody, CPU/FP publication, memory loans and reservations are preserved;
+no per-instruction check, new state bank or code patch is added. Generic fallback
+remains for unrecognized encodings and ordered/atomic operations in unknown
+CpuMemory embeddings without the product Memory/View hardware-order contract.
+Checked memory helpers and staging do not themselves mean interpreter fallback.
+
 Post-SVC re-entry caches the continuation address when code identity, guest PC
 and budget still match. Signal/restart redirection and unknown memory embeddings
 fall back to lookup. Probe flag bit 4 requires both real native links and cached
@@ -194,8 +203,8 @@ unadmitted forms in its declared fixed-width classes. The broader suite executes
 separates Linux-native, Apple/iPad isolation, Windows Android builds and outstanding
 app-UID/ART/16-KiB-device acceptance.
 
-The [remaining plan](https://github.com/project-trames/trames-runtime/blob/77a2f4716c2231cc3956eb8253b3dda7506f83a4/docs/roadmap/native-jit-coverage.md)
-now covers execution-epoch boundaries, stateful ABI ownership and device acceptance.
+The [remaining plan](https://github.com/project-trames/trames-runtime/blob/e8d9d339e5a3d78db0f7e3410538a4d48d97c846/docs/roadmap/native-jit-coverage.md)
+now covers generic embedding/encoding fallback, stateful ABI ownership and device acceptance.
 SVE/SME and other unowned extensions are not software-emulated or advertised.
 
 The exclusive-memory category is now native at every single/pair width:
@@ -279,3 +288,29 @@ also record the ordinary-path controls and the limitations of the measurements.
 The paired pin includes the separate AES CI correction: amd64 tests now verify
 the already-existing pre-effect fallback, while AArch64 tests require real AES
 execution and known vectors.
+
+### Execution invalidation boundary completion
+
+Scalar/linked, vector and fused-memory native entries now distinguish an empty
+epoch invalidation from an untranslated instruction. Existing code-page identity
+revalidation can reuse unchanged translations; repeated invalidation yields the
+execution slot after one cold retry, without interpreter stepping. A completed
+prefix retains exact GPR/NZCV/FP state and retirement through SVC, native-call,
+trap, memory-fault and cooperative-yield outcomes. Retry limits are compile-time
+specializations, and the generated assembler/renderer/compiler sections and
+120-byte Frame ABI are unchanged.
+
+The core probe adds 20 programs with explicit guest stores into its own W+X
+mapping, replacing a target with arithmetic, SVC, BRK, typed native call or a
+faulting load at budgets 1/2/3/64. It compares whole state, text, per-slice exits,
+fault retirement and zero fallback with the original interpreter. The backend
+never rewrites guest text. Existing NZCV fixtures now use public architectural
+bits 31..28. JNI schema 1 / 40 bytes and probe flags remain unchanged.
+
+Runtime's [boundary acceptance](https://github.com/project-trames/trames-runtime/blob/e8d9d339e5a3d78db0f7e3410538a4d48d97c846/docs/validation/jit-execution-boundaries-20261128.md)
+records eight category tests with 618 scenarios, 146 actual Linux JIT tests in
+Debug/Release, 115 Apple fallback tests, the expected baseline regression and
+CPU-only ordinary/SVC controls. Linux executes all four core JIT tests natively;
+Apple compiles native emission out. Default core tests, scoped strict lint and
+iPad dependency isolation pass. These checks do not replace Windows APK builds
+or real Android app-UID/ART/signal/16-KiB-device acceptance.

@@ -112,6 +112,7 @@ pub fn probe() -> Result<Probe, String> {
         exclusive_category_probe()?;
         special_memory_category_probe()?;
         compatibility_category_probe()?;
+        execution_boundary_probe()?;
         true
     } else {
         false
@@ -1098,7 +1099,7 @@ fn compatibility_category_probe() -> Result<(), String> {
             let mut state = Aarch64State {
                 pc: 0x1000,
                 sp: 0xa5aa_0000_0001_0000,
-                nzcv: 0xb,
+                nzcv: 0xb0000000,
                 tpidr_el0: 123,
                 tpidr2_el0: 456,
                 fpsr: 0x10,
@@ -1162,6 +1163,105 @@ fn compatibility_category_probe() -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(feature = "jit")]
+fn execution_boundary_probe() -> Result<(), String> {
+    use trames_execution::Aarch64State;
+    // The guest explicitly writes its own W+X instruction. Backend-generated
+    // code remains separate; every other guest instruction must stay unchanged.
+    let words = [
+        0x1e622820u32,
+        0xb1000529,
+        0xb9000032,
+        0x91010000,
+        0xd4000001,
+    ];
+    for replacement in [0x91000800, 0xd4000001, 0xd4200000, 0xd44a8a40, 0xf9400060] {
+        for budget in [1, 2, 3, 64] {
+            let make = || -> Result<Memory, String> {
+                let mut m = Memory::default();
+                m.map(0x1000, PAGE_SIZE, Permissions::RW)
+                    .map_err(|e| e.to_string())?;
+                for (i, word) in words.iter().enumerate() {
+                    m.write_array(0x1000 + i as u64 * 4, word.to_le_bytes())
+                        .map_err(|e| e.to_string())?;
+                }
+                m.protect(
+                    0x1000,
+                    PAGE_SIZE,
+                    Permissions {
+                        read: true,
+                        write: true,
+                        execute: true,
+                    },
+                )
+                .map_err(|e| e.to_string())?;
+                Ok(m)
+            };
+            let mut m = make()?;
+            let mut rm = make()?;
+            let mut state = Aarch64State {
+                pc: 0x1000,
+                sp: 0x2000,
+                nzcv: 0xb0000000,
+                fpsr: 0x10,
+                tpidr_el0: 123,
+                tpidr2_el0: 456,
+                ..Default::default()
+            };
+            state.registers[0] = 40;
+            state.registers[1] = 0x100c;
+            state.registers[3] = 0x3000;
+            state.registers[9] = u64::MAX;
+            state.registers[16] = 0x10006;
+            state.registers[17] = 7;
+            state.registers[18] = replacement as u64;
+            state.vectors[1] = 1.5f64.to_bits() as u128;
+            state.vectors[2] = 2.25f64.to_bits() as u128;
+            let mut cpu = Cpu::new(0, 0);
+            let mut reference = trames_interpreter::Cpu::new(0, 0);
+            cpu.restore_architectural_state(&state);
+            reference.restore_architectural_state(&state);
+            cpu.set_native_calls(true);
+            reference.set_native_calls(true);
+            let mut engine = <Cpu as Backend>::Engine::default();
+            let mut exited = false;
+            for _ in 0..16 {
+                let actual = cpu.run(&mut engine, &mut m, budget);
+                let expected = reference.run_slice(&mut rm, budget);
+                if format!("{actual:?}") != format!("{expected:?}")
+                    || cpu.architectural_state() != reference.architectural_state()
+                    || cpu.fault_retired() != reference.fault_retired()
+                {
+                    return Err(format!("execution boundary probe {replacement:x}/{budget}: {actual:?}/{expected:?}"));
+                }
+                if !matches!(actual, SliceOutcome::Yield { .. }) {
+                    exited = true;
+                    break;
+                }
+            }
+            if !exited
+                || engine.stats.fallback_instructions != 0
+                || m.read_array::<4096>(0x1000).map_err(|e| e.to_string())?
+                    != rm.read_array::<4096>(0x1000).map_err(|e| e.to_string())?
+            {
+                return Err("execution boundary progress/state probe failed".into());
+            }
+            for (i, original) in words.iter().enumerate() {
+                let expected = if i == 3 { replacement } else { *original };
+                if m.fetch_u32(0x1000 + i as u64 * 4)
+                    .map_err(|e| e.to_string())?
+                    != expected
+                {
+                    return Err(
+                        "backend altered guest text outside the explicit guest store".into(),
+                    );
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// # Safety
 /// `out` must point to a live, aligned, writable Probe owned by the caller.
 #[unsafe(no_mangle)]
@@ -1182,6 +1282,13 @@ pub unsafe extern "C" fn trames_android_probe(out: *mut Probe) -> i32 {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "jit")]
+    #[test]
+    fn execution_boundaries_revalidate_only_guest_authorized_code_changes() {
+        if trames_jit::NATIVE_COMPILED {
+            super::execution_boundary_probe().unwrap();
+        }
+    }
     #[cfg(feature = "jit")]
     #[test]
     fn compatibility_probe_preserves_the_existing_profile_without_interpreter_fallback() {
