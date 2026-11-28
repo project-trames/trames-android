@@ -10,6 +10,8 @@ mod abstract_memory_probe;
 #[cfg(feature = "jit")]
 mod control_category_probe;
 #[cfg(feature = "jit")]
+mod lut_probe;
+#[cfg(feature = "jit")]
 mod scalar_category_probe;
 #[cfg(feature = "jit")]
 mod vector_encoding_probe;
@@ -125,6 +127,7 @@ pub fn probe() -> Result<Probe, String> {
         abstract_memory_probe::run()?;
         scalar_category_probe::run()?;
         control_category_probe::run()?;
+        lut_probe::run()?;
         vector_encoding_probe::run()?;
         true
     } else {
@@ -1295,6 +1298,14 @@ pub unsafe extern "C" fn trames_android_probe(out: *mut Probe) -> i32 {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "jit")]
+    #[test]
+    fn lut_probe_keeps_actual_host_instructions_and_rejects_absent_extensions() {
+        if trames_jit::NATIVE_COMPILED {
+            super::lut_probe::run().unwrap();
+        }
+    }
+
     #[cfg(feature = "jit")]
     #[test]
     fn vector_encodings_keep_reserved_faults_and_allocated_neighbors_native() {
