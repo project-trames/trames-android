@@ -147,3 +147,24 @@ untranslated BF16/FHM/FCMA/DotProd/I8MM/RDM/FP16/JSCVT/FRINT forms. LS64 waits f
 an owned HWCAP3/device-memory contract. See the
 [category report](https://github.com/project-trames/trames-runtime/blob/76c662beea2aaa93f074506a2b7fd8972f0d7c3a/docs/validation/jit-move-crypto-20261128.md) and
 [remaining category plan](https://github.com/project-trames/trames-runtime/blob/76c662beea2aaa93f074506a2b7fd8972f0d7c3a/docs/roadmap/native-jit-coverage.md).
+
+
+The system category probe now also requires guest TLS/TLS2, FPCR/FPSR updates
+and clearing, the guest's exact 64-byte DC ZVA block, translated cache maintenance,
+barriers/hints, all four counter aliases, and cached native-call/trap exits. It
+checks complete reference state/data, exact retirement, zero interpreter entry
+and unchanged guest code. Current call opt-ins are checked at the reached typed
+boundary. There is no per-instruction JNI transition or new extension state.
+
+On ARM64 Linux/Android the software backends now share actual CNTVCT/CNTFRQ;
+ordinary JIT counter reads are direct hardware MRS and synchronized aliases
+retain ordering. This replaces the artificial 1-GHz Linux software timer and
+allows coherent calibration of Runtime's existing optional Linux vDSO. Apple/
+iPad keep their portable counter and interpreter-only dependency graph. The VM
+acceptance uses a 24-MHz counter; frequency is not hard-coded in production.
+[System category validation](https://github.com/project-trames/trames-runtime/blob/1ef4b02bdc53059abd15aadbba3f2dc67dea32ab/docs/validation/jit-system-20261128.md)
+records Linux native and Apple isolation results separately from Windows Android
+builds and outstanding app-UID/ART/16-KiB-device execution.
+The [current coverage plan](https://github.com/project-trames/trames-runtime/blob/1ef4b02bdc53059abd15aadbba3f2dc67dea32ab/docs/roadmap/native-jit-coverage.md)
+keeps remaining arithmetic, exclusives, special memory and compatibility/stateful
+extensions visible; this pin does not claim full native instruction coverage.
