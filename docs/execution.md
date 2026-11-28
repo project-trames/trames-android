@@ -17,8 +17,9 @@ conditional and register branches. CRC/FlagM/FlagM2/CSSC emit actual host opcode
 when process-host HWCAP provides them. Native capability advertisement is now
 host-driven; there are no new software extension replacements or extra emulated
 extension state. Original guest memory is RX data, never patched. Remaining
-instruction families retain the legacy interpreter path, including FP/SIMD,
-pairs and exclusive reservations. Each worker owns a bounded RW-to-RX cache;
+instruction families retain the legacy interpreter path, including structure/lane
+SIMD and exclusive reservations. Common FP/NEON arithmetic, scalar/paired vector
+transfers and integer pairs now execute natively. Each worker owns a bounded RW-to-RX cache;
 invalidation reuses Runtime code-page identities. Native blocks are at most 64
 instructions and stay within one 4 KiB guest page. Host x18/TLS are untouched.
 
@@ -61,8 +62,8 @@ linked SUBS/B.NE countdown with exact retirement and NZCV. The JNI ABI remains
 40 bytes. The backend reuses existing task SP/NZCV state and never changes host
 SP or TLS; capability gates run during translation, not per instruction.
 
-Full host-ISA native coverage remains in progress. Remaining memory forms, atomics and
-FP/NEON/vector families are the next groups; stateful extensions need real
+Full host-ISA native coverage remains in progress. Structure/lane vector memory,
+remaining SIMD arithmetic and exclusive reservations are the next groups; stateful extensions need real
 context-save ownership. CPU-only benchmarks exclude Linux syscall handlers,
 filesystem/network, JNI and Android lifecycle costs.
 
@@ -108,5 +109,17 @@ The native CPU probe also requires FP/NEON arithmetic and integer conversion,
 real V31, preserved canonical vector values, zero fallback and one native entry.
 Scalar FP16 arithmetic is included when admitted by the host. Register allocation
 runs in the cold compiler; existing host FP control/status is switched once per
-entry. Vector memory fusion and remaining SIMD families are still pending.
+entry. Vector memory fusion now extends this path; remaining SIMD families are
+still pending.
 [FP/NEON implementation and measurements](https://github.com/project-trames/trames-runtime/blob/05c4fc1d1065d1d8fdde3e1fd52a9ce90a31b89d/docs/validation/jit-fp-neon-20261128.md).
+
+
+The vector-memory probe executes Q LDR/STR and Q LDP/STP loops with native NEON
+ADD, including V31. Flag bit 6 now also requires complete canonical lane values,
+exact retirement, zero fallback/staging, at least 62/64 direct hardware accesses,
+address-proof reuse and one fused entry per loop. The mixed compiler handles
+B/H/S/D/Q scalar transfers and S/D/Q pairs with the existing memory contract.
+Hardware hits stay inside the original FP scope; checked callbacks publish live
+registers and restore host FP control/status before entering Rust, then reload
+guest banks/status on return. JNI schema and feature flags remain unchanged.
+[Vector-memory implementation and measurements](https://github.com/project-trames/trames-runtime/blob/367358df0a0eb25394a4af3146d4ce0d7950690e/docs/validation/jit-vector-memory-20261128.md).

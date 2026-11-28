@@ -104,6 +104,7 @@ pub fn probe() -> Result<Probe, String> {
     let memory_native = if compiled {
         memory_probe()?;
         vector_probe()?;
+        vector_memory_probe()?;
         true
     } else {
         false
@@ -347,6 +348,69 @@ fn vector_probe() -> Result<(), String> {
             != *w
         {
             return Err("FP probe changed guest code".into());
+        }
+    }
+    Ok(())
+}
+
+#[cfg(feature = "jit")]
+fn vector_memory_probe() -> Result<(), String> {
+    for (load, store, width) in [
+        (0x3dc00020u32, 0x3d800020u32, 16),
+        (0xad407c20, 0xad007c20, 32),
+    ] {
+        // LDR/LDP Q, ADD v0.4s, STR/STP Q, SUBS, B.NE, SVC. Pair's V31
+        // shares its number with XZR but remains an ordinary vector register.
+        let words = [load, 0x4ea18400, store, 0xf1000442, 0x54ffff81, 0xd4000001];
+        let mut m = Memory::default();
+        m.map(0x1000, PAGE_SIZE, Permissions::RW)
+            .map_err(|e| e.to_string())?;
+        let data_len = (PAGE_SIZE as usize).max(trames_memory::host_mapping_granule());
+        m.map(0x10000, data_len as u64, Permissions::RW)
+            .map_err(|e| e.to_string())?;
+        m.write(0x10000, &vec![0; data_len])
+            .map_err(|e| e.to_string())?;
+        for (i, w) in words.iter().enumerate() {
+            m.write_array(0x1000 + 4 * i as u64, w.to_le_bytes())
+                .map_err(|e| e.to_string())?;
+        }
+        m.protect(0x1000, PAGE_SIZE, Permissions::RX)
+            .map_err(|e| e.to_string())?;
+        let mut c = Cpu::new(0x1000, 0);
+        c.set_x(1, 0x10000);
+        c.set_x(2, 32);
+        let mut state = c.architectural_state();
+        state.vectors[1] = 0x00000001000000010000000100000001;
+        c.restore_architectural_state(&state);
+        let mut e = <Cpu as Backend>::Engine::default();
+        let out = c.run(&mut e, &mut m, 256);
+        let stats = e.memory_stats();
+        let mut actual = [0; 32];
+        m.read(0x10000, &mut actual[..width])
+            .map_err(|e| e.to_string())?;
+        let expected = (32u128 * 0x00000001000000010000000100000001).to_le_bytes();
+        if !matches!(out, SliceOutcome::Syscall { instructions: 161 })
+            || c.pc() != 0x1018
+            || c.x(2) != 0
+            || actual[..16] != expected
+            || actual[16..width].iter().any(|b| *b != 0)
+            || e.stats.fallback_instructions != 0
+            || stats.instructions != 64
+            || stats.staged != 0
+            || stats.hardware < 62
+            || stats.direct < 62
+            || stats.fused_entries != 1
+            || e.compilation_stats().address_reuses == 0
+        {
+            return Err(format!("native vector-memory fusion probe: {out:?}"));
+        }
+        for (i, w) in words.iter().enumerate() {
+            if m.fetch_u32(0x1000 + 4 * i as u64)
+                .map_err(|e| e.to_string())?
+                != *w
+            {
+                return Err("vector-memory probe changed guest code".into());
+            }
         }
     }
     Ok(())
